@@ -1591,15 +1591,20 @@
 
   // Used by the report form to pull each year/section's saved total strength.
   function getSavedTotal(deptVal, year, section){
-    if(!deptVal) return 0;
-    const yd = getYearStrengthData(deptVal, year);
-    if(!yd) return 0;
-    if(yd.default !== null && yd.default !== undefined) return Number(yd.default);
-    const key = String(section).toUpperCase();
-    if(key === "A" && yd.A !== null && yd.A !== undefined) return Number(yd.A);
-    if(key === "B" && yd.B !== null && yd.B !== undefined) return Number(yd.B);
-    return 0;
+  if(!deptVal) return 0;
+  const yd = getYearStrengthData(deptVal, year);
+  if(!yd) return 0;
+  const key = String(section).toUpperCase();
+  // "Default" (no A/B split) is displayed only under section A on the form
+  // (see applySectionVisibility: showA=true, showB=false for default mode).
+  // Only count it once — under A — or every total doubles.
+  if(yd.default !== null && yd.default !== undefined){
+    return key === "A" ? Number(yd.default) : 0;
   }
+  if(key === "A" && yd.A !== null && yd.A !== undefined) return Number(yd.A);
+  if(key === "B" && yd.B !== null && yd.B !== undefined) return Number(yd.B);
+  return 0;
+}
 
   function updateStrengthStatus(deptVal){
     const ay = currentAcademicYear();
