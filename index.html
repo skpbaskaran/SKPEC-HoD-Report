@@ -1918,7 +1918,6 @@
 
     headEl.value     = info ? (info.head || "") : "";
     staffEl.value    = (info && info.totalStaff !== undefined && info.totalStaff !== null) ? info.totalStaff : "";
-    studentsEl.value = (info && info.totalStudents !== undefined && info.totalStudents !== null) ? info.totalStudents : "";
 
     [headEl, staffEl, studentsEl].forEach(el => {
       if(el.value.toString().trim()) el.classList.remove("invalid");
@@ -2319,7 +2318,6 @@
 
     document.getElementById("outTotalStaff").textContent = document.getElementById("totalstaff").value || "—";
     document.getElementById("outStaffPresent").textContent = document.getElementById("staffpresent").value || "—";
-    document.getElementById("outTotalStudents").textContent = document.getElementById("totalstudents").value || "—";
 
     const mainDeptVal = document.getElementById("dept").value;
     let sumTotal = 0, sumPresent = 0, sumAbsent = 0, haveAnyAbsent = false;
@@ -2349,7 +2347,11 @@
         }
       });
     });
-
+    // Total No. of Students = sum of the saved Class Strength totals (same numbers
+    // used for the attendance table below), so the two totals can never mismatch.
+    const studentsFieldEl = document.getElementById("totalstudents");
+    studentsFieldEl.value = sumTotal || "";
+    document.getElementById("outTotalStudents").textContent = sumTotal || "—";
     document.getElementById("outSumTotal").textContent = sumTotal || "—";
     document.getElementById("outSumPresent").textContent = sumPresent || "—";
     document.getElementById("outSumAbsent").textContent = (haveAnyAbsent || sumTotal) ? sumAbsent : "—";
