@@ -2427,9 +2427,41 @@
       }
     });
 
+    // Present + Absent must never exceed the saved Total strength for that
+    // year/section — otherwise the numbers don't make sense. Block submit if so.
+    let countMismatch = false;
+    const mainDeptVal = document.getElementById("dept").value;
+    currentYears.forEach(n => {
+      ["A","B"].forEach(sec => {
+        const secLower = sec.toLowerCase();
+        const pEl = document.getElementById(`y${n}${secLower}present`);
+        const aEl = document.getElementById(`y${n}${secLower}absent`);
+        if(!pEl || !aEl) return;
+
+        const wrapper = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="${sec}"]`);
+        const visible = !wrapper || wrapper.style.display !== "none";
+        if(!visible) return;
+
+        const total = getSavedTotal(mainDeptVal, n, sec);
+        const present = pEl.value === "" ? 0 : Number(pEl.value);
+        const absent = aEl.value === "" ? 0 : Number(aEl.value);
+
+        if(total && (present + absent > total)){
+          pEl.classList.add("invalid");
+          aEl.classList.add("invalid");
+          valid = false;
+          countMismatch = true;
+          if(!firstInvalid) firstInvalid = pEl;
+        }
+      });
+    });
+
     if(valid){
       formErrorEl.classList.remove("show");
     } else {
+      formErrorEl.textContent = countMismatch
+        ? "⚠️ Present + Absent cannot be more than the Total strength for a class. Please check the highlighted fields."
+        : "⚠️ Please fill in all fields (Apex Training and Remarks are optional) before submitting.";
       formErrorEl.classList.add("show");
       if(firstInvalid){
         firstInvalid.focus();
