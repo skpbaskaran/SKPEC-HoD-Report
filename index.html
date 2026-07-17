@@ -1,0 +1,2469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>S.K.P Engineering College — HOD's Report Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --navy:#13294B;
+    --navy-deep:#0B1B33;
+    --navy-mid:#1E3A63;
+    --navy-soft:#EEF1F6;
+    --navy-hairline: rgba(19,41,75,.22);
+    --paper:#FFFFFF;
+    --ink:#1F2937;
+    --grey:#5B6472;
+    --grey-light:#8A93A3;
+    --border:#E2E6ED;
+    --danger:#B3423A;
+
+    --r-sm:8px;
+    --r-md:12px;
+    --r-lg:18px;
+
+    --sh-sm:0 2px 6px rgba(15,26,46,.08);
+    --sh-md:0 10px 24px rgba(15,26,46,.12);
+    --sh-lg:0 24px 56px rgba(8,16,32,.32);
+    --sh-navy:0 10px 22px rgba(19,41,75,.30);
+
+    --ease:cubic-bezier(.22,.9,.32,1);
+  }
+
+  *{ box-sizing:border-box; }
+  *::selection{ background:var(--navy-soft); color:var(--navy-deep); }
+
+  html{ scroll-behavior:smooth; }
+
+  body{
+    margin:0;
+    font-family:'Inter','Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    background:
+      linear-gradient(160deg,#0B1B33 0%, #13294B 45%, #1c3660 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+    color:var(--ink);
+    padding:40px 24px 72px;
+  }
+
+  .app{
+    max-width:1180px;
+    margin:0 auto;
+    display:grid;
+    grid-template-columns: 384px 1fr;
+    gap:32px;
+    align-items:start;
+    animation: fadeUp .55s var(--ease) both;
+  }
+
+  @keyframes fadeUp{
+    from{ opacity:0; transform:translateY(14px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  @media (max-width: 920px){
+    .app{ grid-template-columns: 1fr; gap:24px; }
+  }
+
+  /* BRAND BAR */
+  .brandbar{
+    max-width:1180px;
+    margin:0 auto 32px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    color:rgba(255,255,255,.85);
+    animation: fadeUp .5s var(--ease) both;
+  }
+  .brandbar img{
+    width:48px; height:48px;
+    border-radius:50%;
+    background:#fff;
+    padding:4px;
+    box-shadow:0 4px 14px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.25);
+    flex-shrink:0;
+  }
+  .brandbar h1{
+    font-size:20px;
+    margin:0;
+    letter-spacing:.3px;
+    font-weight:700;
+    color:#fff;
+  }
+  .brandbar span{
+    display:block;
+    font-size:11.5px;
+    color:rgba(255,255,255,.55);
+    letter-spacing:2px;
+    margin-top:4px;
+    font-weight:600;
+  }
+
+  /* FORM PANEL */
+  .panel{
+    background:#fff;
+    border-radius:var(--r-lg);
+    padding:32px;
+    box-shadow:var(--sh-lg);
+    border:1px solid rgba(255,255,255,.6);
+    position:sticky;
+    top:24px;
+  }
+  .panel h2{
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:1.6px;
+    color:var(--navy);
+    margin:0 0 8px;
+    font-weight:700;
+    position:relative;
+    padding-bottom:12px;
+  }
+  .panel h2::after{
+    content:"";
+    position:absolute;
+    left:0; bottom:0;
+    width:36px; height:3px;
+    border-radius:2px;
+    background:var(--navy);
+  }
+  .panel .sub{
+    font-size:13px;
+    color:var(--grey);
+    margin:0 0 24px;
+    line-height:1.55;
+  }
+
+  .field{ margin-bottom:16px; }
+  .field label{
+    display:block;
+    font-size:12px;
+    font-weight:700;
+    color:var(--navy);
+    margin-bottom:8px;
+    letter-spacing:.3px;
+  }
+  .field input, .field select{
+    width:100%;
+    height:44px;
+    padding:0 14px;
+    border:1.5px solid var(--border);
+    border-radius:var(--r-sm);
+    font-size:14px;
+    color:var(--ink);
+    background:#F9FAFC;
+    transition:border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+    font-family:inherit;
+    appearance:none;
+    -webkit-appearance:none;
+  }
+  .field select{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%235B6472' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 14px center;
+    padding-right:34px;
+    cursor:pointer;
+  }
+  .field input::placeholder{ color:var(--grey-light); }
+  .field input:hover, .field select:hover{
+    border-color:#C7CEDB;
+  }
+  .field input:focus, .field select:focus{
+    outline:none;
+    border-color:var(--navy);
+    box-shadow:0 0 0 4px rgba(19,41,75,.14);
+    background:#fff;
+  }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .field-pair{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .field-pair .field{ margin-bottom:0; }
+  .field-pair .absentees-field{ grid-column: 1 / -1; margin-top:2px; }
+
+  .strength-year-row{
+    display:grid;
+    grid-template-columns: 84px 122px 1fr;
+    gap:10px;
+    align-items:center;
+    margin-bottom:10px;
+  }
+  .strength-year-row .strength-year-label{
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--navy);
+    letter-spacing:.2px;
+  }
+  .strength-year-row select, .strength-year-row input{
+    width:100%;
+    height:40px;
+    padding:0 12px;
+    border:1.5px solid var(--border);
+    border-radius:var(--r-sm);
+    font-size:13.5px;
+    color:var(--ink);
+    background:#F9FAFC;
+    font-family:inherit;
+    appearance:none;
+    -webkit-appearance:none;
+  }
+  .strength-year-row select{
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%235B6472' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 10px center;
+    padding-right:26px;
+    cursor:pointer;
+  }
+  .strength-year-row select:disabled, .strength-year-row input:disabled{
+    background:#EEF1F6;
+    color:var(--grey-light);
+    cursor:not-allowed;
+  }
+  @media (max-width:480px){
+    .strength-year-row{ grid-template-columns: 1fr 1fr; }
+    .strength-year-row .strength-year-label{ grid-column: 1 / -1; }
+  }
+
+  .strength-card{
+    background:var(--navy-soft);
+    border:1.5px solid var(--navy-hairline);
+    border-radius:var(--r-md);
+    padding:16px 16px 14px;
+    margin-bottom:20px;
+  }
+  .strength-card-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:6px;
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--navy);
+    margin-bottom:10px;
+  }
+  .strength-status{
+    font-size:11px;
+    font-weight:600;
+    color:var(--grey);
+    background:#fff;
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:3px 10px;
+  }
+  .strength-status.saved{
+    color:#1e7a3f;
+    border-color:#bfe6cd;
+    background:#eafaf1;
+  }
+  .strength-hint{
+    font-size:11.5px;
+    color:var(--grey);
+    line-height:1.5;
+    margin:10px 0 0;
+  }
+  .strength-dept-chosen{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--navy);
+    background:#fff;
+    border:1px solid var(--navy-hairline);
+    border-radius:20px;
+    padding:5px 12px;
+    margin-bottom:12px;
+  }
+  .strength-dept-chosen::before{ content:"🏫"; font-size:12px; }
+  #strengthChangeDeptBtn{
+    width:100%;
+    background:#fff;
+    border:1.5px solid var(--border);
+    color:var(--grey);
+    font-weight:600;
+  }
+  #strengthChangeDeptBtn:hover{
+    border-color:#C7CEDB;
+    color:var(--navy);
+    background:#F9FAFC;
+  }
+
+  .admin-badge{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.2px;
+    border-radius:20px;
+    padding:3px 10px;
+    white-space:nowrap;
+  }
+  .admin-badge.locked{
+    color:#a33a3a;
+    background:#fdecec;
+    border:1px solid #f3c6c6;
+  }
+  .admin-badge.unlocked{
+    color:#1e7a3f;
+    background:#eafaf1;
+    border:1px solid #bfe6cd;
+    cursor:pointer;
+  }
+  .field input:disabled{
+    background:#f2f3f5;
+    color:var(--grey);
+    cursor:not-allowed;
+  }
+  .field input:read-only{
+    background:#f2f3f5;
+    color:var(--grey);
+    cursor:default;
+  }
+  .field input:read-only:focus{
+    box-shadow:none;
+    border-color:var(--border);
+    background:#f2f3f5;
+  }
+  #saveDeptInfoBtn:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+  }
+  #saveStrengthBtn:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+  }
+
+  .sub-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:9px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    margin-bottom:8px;
+    font-size:12.5px;
+    background:#fff;
+  }
+  .sub-row .sub-dept{ font-weight:700; color:var(--navy); }
+  .sub-row .sub-meta{ color:var(--grey); font-size:11px; margin-top:2px; }
+  .sub-row .viewSubBtn{
+    font-size:11px;
+    padding:6px 12px;
+    border-radius:6px;
+    border:1px solid var(--border);
+    background:#fff;
+    cursor:pointer;
+    color:var(--navy);
+    font-weight:600;
+    white-space:nowrap;
+  }
+  .sub-row .viewSubBtn:hover{ background:var(--navy-soft); }
+  .sub-row{ flex-direction:column; align-items:stretch; }
+  .sub-row-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  table.sub-attendance-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:8px;
+    font-size:11px;
+  }
+  table.sub-attendance-table th, table.sub-attendance-table td{
+    border:1px solid var(--border);
+    padding:4px 6px;
+    text-align:center;
+    color:var(--ink);
+  }
+  table.sub-attendance-table th{
+    background:var(--navy-soft);
+    color:var(--navy);
+    font-weight:700;
+  }
+
+  /* Success modal (post-submission) */
+  .success-modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(8,16,32,.62);
+    backdrop-filter:blur(3px);
+    -webkit-backdrop-filter:blur(3px);
+    z-index:1000;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .success-modal-overlay.open{ display:flex; animation:modalFade .22s var(--ease) both; }
+  .success-modal-box{
+    background:#fff;
+    border-radius:20px;
+    width:100%;
+    max-width:400px;
+    padding:0;
+    box-shadow:var(--sh-lg);
+    overflow:hidden;
+    animation:modalPop .32s var(--ease) both;
+    text-align:center;
+  }
+  .success-modal-head{
+    background:linear-gradient(150deg,#0B1B33 0%, #13294B 55%, #1E3A63 100%);
+    padding:30px 26px 24px;
+    position:relative;
+  }
+  .success-modal-logo{
+    width:64px; height:64px;
+    border-radius:50%;
+    background:#fff;
+    padding:6px;
+    margin:0 auto 14px;
+    display:block;
+    box-shadow:0 6px 18px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.25);
+    animation:logoPop .45s var(--ease) .05s both;
+  }
+  @keyframes logoPop{
+    from{ opacity:0; transform:scale(.6); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  .success-modal-check{
+    width:38px; height:38px;
+    border-radius:50%;
+    background:#1e7a3f;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto 12px;
+    box-shadow:0 0 0 5px rgba(30,122,63,.22);
+    animation:checkPop .4s var(--ease) .2s both;
+  }
+  @keyframes checkPop{
+    from{ opacity:0; transform:scale(.4); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  .success-modal-check svg{ width:20px; height:20px; }
+  .success-modal-box h3{
+    margin:0 0 6px;
+    font-size:18px;
+    font-weight:700;
+    color:#fff;
+    letter-spacing:.2px;
+  }
+  .success-modal-box .success-dept{
+    margin:0;
+    font-size:13px;
+    color:rgba(255,255,255,.72);
+    line-height:1.5;
+    font-weight:600;
+  }
+  .success-modal-body{
+    padding:22px 26px 26px;
+  }
+  .success-modal-body p{
+    margin:0 0 20px;
+    font-size:13.5px;
+    color:var(--grey);
+    line-height:1.6;
+  }
+  .success-modal-body .btn{
+    width:100%;
+    height:46px;
+    border-radius:10px;
+    font-weight:700;
+    background:var(--navy);
+    box-shadow:var(--sh-navy);
+    transition:transform .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
+  }
+  .success-modal-body .btn:hover{
+    background:var(--navy-mid);
+    transform:translateY(-1px);
+    box-shadow:0 14px 28px rgba(19,41,75,.34);
+  }
+
+  /* Admin login modal */
+  .admin-modal-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(8,16,32,.62);
+    backdrop-filter:blur(3px);
+    -webkit-backdrop-filter:blur(3px);
+    z-index:999;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .admin-modal-overlay.open{ display:flex; animation:modalFade .22s var(--ease) both; }
+  @keyframes modalFade{ from{ opacity:0; } to{ opacity:1; } }
+  .admin-modal-box{
+    background:#fff;
+    border-radius:20px;
+    width:100%;
+    max-width:368px;
+    padding:0;
+    box-shadow:var(--sh-lg);
+    overflow:hidden;
+    animation:modalPop .28s var(--ease) both;
+  }
+  @keyframes modalPop{
+    from{ opacity:0; transform:translateY(10px) scale(.97); }
+    to{ opacity:1; transform:translateY(0) scale(1); }
+  }
+  .admin-modal-head{
+    background:linear-gradient(150deg,#0B1B33 0%, #13294B 55%, #1E3A63 100%);
+    padding:26px 26px 22px;
+    position:relative;
+  }
+  .admin-modal-icon{
+    width:46px; height:46px;
+    border-radius:14px;
+    background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.22);
+    display:flex; align-items:center; justify-content:center;
+    font-size:21px;
+    margin-bottom:14px;
+  }
+  .admin-modal-box h3{
+    margin:0 0 5px;
+    font-size:17px;
+    font-weight:700;
+    color:#fff;
+    letter-spacing:.2px;
+  }
+  .admin-modal-box p{
+    margin:0;
+    font-size:12.5px;
+    color:rgba(255,255,255,.62);
+    line-height:1.5;
+  }
+  .admin-modal-body{
+    padding:22px 26px 24px;
+  }
+  .admin-modal-field{
+    margin-bottom:14px;
+  }
+  .admin-modal-field label{
+    display:block;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    color:var(--navy);
+    margin-bottom:7px;
+  }
+  .admin-modal-box input[type="password"], .admin-modal-box input[type="text"]{
+    width:100%;
+    box-sizing:border-box;
+    height:44px;
+    padding:0 14px;
+    border:1.5px solid var(--border);
+    border-radius:10px;
+    font-size:14px;
+    font-family:inherit;
+    background:#F9FAFC;
+    color:var(--ink);
+    transition:border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
+  }
+  .admin-modal-box input[type="password"]:hover, .admin-modal-box input[type="text"]:hover{
+    border-color:#C7CEDB;
+  }
+  .admin-modal-box input[type="password"]:focus, .admin-modal-box input[type="text"]:focus{
+    outline:none;
+    border-color:var(--navy);
+    box-shadow:0 0 0 4px rgba(19,41,75,.14);
+    background:#fff;
+  }
+  .admin-modal-error{
+    font-size:12px;
+    font-weight:600;
+    color:#c0392b;
+    min-height:16px;
+    margin:2px 0 10px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .admin-modal-error:not(:empty)::before{
+    content:"⚠";
+    font-size:12px;
+  }
+  .admin-modal-actions{
+    display:flex;
+    gap:10px;
+    margin-top:8px;
+  }
+  .admin-modal-actions .btn{ flex:1; height:44px; border-radius:10px; font-weight:700; }
+  .admin-modal-actions .btn-primary{
+    background:var(--navy);
+    box-shadow:var(--sh-navy);
+    transition:transform .16s var(--ease), box-shadow .16s var(--ease), background .16s var(--ease);
+  }
+  .admin-modal-actions .btn-primary:hover{
+    background:var(--navy-mid);
+    transform:translateY(-1px);
+    box-shadow:0 14px 28px rgba(19,41,75,.34);
+  }
+  .admin-modal-actions .btn-ghost{
+    background:#fff;
+    border:1.5px solid var(--border);
+    color:var(--grey);
+    transition:border-color .16s var(--ease), color .16s var(--ease), background .16s var(--ease);
+  }
+  .admin-modal-actions .btn-ghost:hover{
+    border-color:#C7CEDB;
+    color:var(--navy);
+    background:#F9FAFC;
+  }
+
+  .field input.invalid, .field select.invalid{
+    border-color:#c0392b;
+    box-shadow:0 0 0 3px rgba(192,57,43,.12);
+  }
+  .hint{
+    font-size:11.5px;
+    color:var(--grey-light);
+    margin-top:5px;
+  }
+  .form-error{
+    display:none;
+    align-items:center;
+    gap:8px;
+    background:#fdecea;
+    border:1px solid #f1c2bd;
+    color:#a5322a;
+    font-size:13px;
+    font-weight:600;
+    padding:10px 14px;
+    border-radius:var(--r-sm);
+    margin-top:16px;
+  }
+  .form-error.show{ display:flex; }
+  .actions{ display:flex; flex-direction:column; gap:12px; margin-top:24px; }
+  .btn{
+    border:none;
+    border-radius:var(--r-sm);
+    width:100%;
+    height:48px;
+    padding:0 16px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    letter-spacing:.3px;
+    transition:transform .16s var(--ease), box-shadow .16s var(--ease), opacity .16s var(--ease), filter .16s var(--ease);
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    font-family:inherit;
+    position:relative;
+  }
+  .btn:hover{ transform:translateY(-2px); filter:brightness(1.04); }
+  .btn:active{ transform:translateY(0px); filter:brightness(.98); }
+  .btn:focus-visible{
+    outline:none;
+    box-shadow:0 0 0 4px rgba(19,41,75,.22);
+  }
+  .btn-primary{
+    background:linear-gradient(135deg, var(--navy), var(--navy-deep));
+    color:#fff;
+    box-shadow:var(--sh-navy);
+  }
+  .btn-primary:hover{ box-shadow:0 14px 28px rgba(19,41,75,.36); }
+  .btn-secondary{
+    background:#fff;
+    color:var(--navy);
+    border:1.5px solid var(--navy);
+    box-shadow:none;
+  }
+  .btn-secondary:hover{ background:var(--navy-soft); box-shadow:var(--sh-sm); }
+  .btn-ghost{
+    background:#fff;
+    color:var(--navy);
+    border:1.5px solid var(--border);
+    box-shadow:none;
+  }
+  .btn-ghost:hover{
+    background:#F9FAFC;
+    border-color:#C7CEDB;
+    box-shadow:var(--sh-sm);
+  }
+  .btn:disabled{ opacity:.55; cursor:not-allowed; transform:none !important; filter:none !important; box-shadow:none !important; }
+
+  .hint{
+    font-size:12px;
+    color:var(--grey);
+    margin-top:16px;
+    line-height:1.6;
+    border-top:1px dashed var(--border);
+    padding-top:16px;
+  }
+
+  /* PREVIEW */
+  .preview-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .cert-page{
+    width:794px;
+    height:1123px;
+    max-width:100%;
+    background:var(--paper);
+    padding:40px;
+    position:relative;
+    box-shadow:0 6px 18px rgba(15,26,46,.14), 0 1px 3px rgba(15,26,46,.10);
+    border-radius:4px;
+    box-sizing:border-box;
+    transition:box-shadow .25s var(--ease);
+    margin-bottom:32px;
+  }
+  .cert-page:last-child{ margin-bottom:0; }
+  .cert-page-footer{
+    position:absolute;
+    right:40px;
+    bottom:14px;
+    font-family:'Inter', sans-serif;
+    font-size:10px;
+    letter-spacing:.4px;
+    color:var(--grey-light);
+  }
+
+  .cert-border-outer{
+    border:1.75px solid var(--navy);
+    padding:36px 40px;
+    position:relative;
+    height:100%;
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+  }
+  .cert-border-inner{
+    padding:0;
+    height:100%;
+    box-sizing:border-box;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+  .cert-watermark{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:400px;
+    height:400px;
+    object-fit:contain;
+    opacity:.045;
+    filter:grayscale(100%);
+    pointer-events:none;
+    user-select:none;
+    z-index:-1;
+  }
+
+  .cert-header{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:18px;
+    padding:10px 0;
+    margin:0;
+  }
+  .cert-header img{
+    width:52px; height:52px;
+    object-fit:contain;
+    align-self:center;
+  }
+  .cert-header .htext{ text-align:center; align-self:center; }
+  .cert-header .htext h1{
+    margin:0;
+    font-family:'Playfair Display', 'Georgia', serif;
+    font-weight:700;
+    font-size:26px;
+    color:var(--navy);
+    letter-spacing:.3px;
+  }
+  .cert-header .htext .place{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:11.5px;
+    letter-spacing:3px;
+    color:var(--navy);
+    opacity:.68;
+    margin-top:5px;
+    text-transform:uppercase;
+  }
+
+  .cert-rule{
+    height:1px;
+    background:var(--navy);
+    opacity:.28;
+    width:72%;
+    margin:22px auto 26px;
+  }
+
+  .cert-title{
+    text-align:center;
+    font-family:'Playfair Display', 'Georgia', serif;
+    font-size:28px;
+    font-weight:800;
+    letter-spacing:2.5px;
+    color:var(--navy);
+    margin:0 0 8px;
+  }
+  .cert-serial{
+    text-align:right;
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:11.5px;
+    letter-spacing:.3px;
+    color:var(--grey);
+    margin-bottom:24px;
+  }
+
+  .cert-body{
+    font-family:'Lora', 'Georgia', serif;
+    font-weight:400;
+    font-size:15.5px;
+    line-height:1.75;
+    color:var(--ink);
+    text-align:justify;
+    margin:6px 0 0;
+    flex:1 1 auto;
+  }
+  .cert-body b{
+    color:var(--navy);
+    font-weight:600;
+    padding:0 1px;
+    text-transform:uppercase;
+  }
+
+  .info-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px 24px;
+    margin-bottom:18px;
+  }
+  .info-row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    border-bottom:1px dashed var(--border);
+    padding-bottom:4px;
+    font-family:'Inter', sans-serif;
+    font-size:13px;
+  }
+  .info-label{
+    color:var(--grey);
+    font-weight:600;
+  }
+  .info-value{
+    color:var(--navy);
+    font-weight:700;
+    text-align:right;
+  }
+
+  .section-label{
+    font-family:'Inter', sans-serif;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:1.4px;
+    text-transform:uppercase;
+    color:var(--navy);
+    margin:20px 0 8px;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--navy);
+    opacity:.9;
+  }
+
+  table.report-table{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:4px;
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+  }
+  table.report-table th, table.report-table td{
+    border:1px solid var(--navy-hairline);
+    padding:6px 8px;
+    text-align:center;
+    color:var(--ink);
+  }
+  table.report-table th{
+    background:var(--navy-soft);
+    color:var(--navy);
+    font-weight:700;
+    letter-spacing:.3px;
+  }
+  table.report-table tr.total-row td{
+    font-weight:700;
+    color:var(--navy);
+    background:var(--navy-soft);
+  }
+
+  .remarks-box{
+    min-height:60px;
+    border:1px solid var(--navy-hairline);
+    border-radius:6px;
+    padding:10px 12px;
+    font-family:'Lora', 'Georgia', serif;
+    font-size:13.5px;
+    line-height:1.7;
+    color:var(--ink);
+    white-space:pre-wrap;
+    background:#FBFBFD;
+  }
+
+  .apex-label{
+    color:var(--danger);
+    border-bottom-color:var(--danger);
+    font-size:13px;
+  }
+  table.apex-table th{
+    background:#FBEAE8;
+    color:var(--danger);
+  }
+  table.apex-table td{
+    font-weight:700;
+    border-color:rgba(179,66,58,.35);
+  }
+  table.apex-table{
+    border:1.5px solid var(--danger);
+  }
+
+  .cert-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-top:36px;
+  }
+  .sig-block{ text-align:center; width:220px; }
+  .sig-line{
+    border-top:1px solid var(--navy);
+    margin-bottom:8px;
+    height:38px;
+  }
+  .sig-block .role{
+    font-family:'Inter', sans-serif;
+    font-weight:700;
+    font-size:12.5px;
+    letter-spacing:.3px;
+    color:var(--navy);
+  }
+  .sig-block .sub{
+    font-family:'Inter', sans-serif;
+    font-weight:500;
+    font-size:10.5px;
+    color:var(--grey);
+    margin-top:2px;
+  }
+
+  .cert-date{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:13px;
+    color:var(--ink);
+  }
+
+  .cert-bottom-rule{
+    height:1px;
+    background:var(--navy);
+    opacity:.28;
+    width:72%;
+    margin:40px auto 0;
+  }
+  .cert-address{
+    text-align:center;
+    font-family:'Inter', sans-serif;
+    font-weight:500;
+    font-size:11px;
+    color:var(--grey);
+    margin-top:12px;
+    letter-spacing:.4px;
+  }
+
+
+
+
+  /* Scrollbar polish (non-functional, cosmetic only) */
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:rgba(19,41,75,.35); border-radius:8px; }
+  ::-webkit-scrollbar-thumb:hover{ background:rgba(19,41,75,.55); }
+
+  @media (max-width: 920px){
+    .panel{ position:static; top:auto; }
+    .brandbar{ justify-content:center; text-align:left; }
+  }
+
+  @media (max-width: 480px){
+    body{ padding:24px 14px 56px; }
+    .panel{ padding:24px 20px; }
+    .brandbar h1{ font-size:17px; }
+  }
+
+  @media print{
+    @page{ size:A4; margin:0; }
+    html, body{ margin:0; background:#fff; padding:0; }
+    .panel, .brandbar, .actions, .admin-modal-overlay{ display:none !important; }
+    .app{ grid-template-columns:1fr; gap:0; }
+    .cert-page{
+      box-shadow:none; border-radius:0; width:210mm; height:297mm; margin:0;
+      page-break-after:always; break-after:page;
+    }
+    .cert-page:last-child{ page-break-after:auto; break-after:auto; }
+  }
+
+</style>
+</head>
+<body>
+
+  <div class="brandbar">
+    <img id="brandLogo" style="cursor:pointer;" src="data:image/jpeg;base64,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" alt="SKP logo" />
+    <div>
+      <h1>S.K.P Engineering College</h1>
+      <span>HOD'S REPORT GENERATOR</span>
+    </div>
+  </div>
+
+  <div class="app">
+
+    <!-- FORM -->
+    <div class="panel">
+      <div id="hodTopSection">
+      <h2>Report Details</h2>
+      <p class="sub">Fill in the details to generate the report live on the right.</p>
+
+      <div class="row2">
+        <div class="field">
+          <label for="dept">Department Name <span style="color:#c0392b;">*</span></label>
+          <select id="dept">
+            <option value="">— Select Department —</option>
+            <optgroup label="🎓 UG Courses">
+              <option value="B.E. Artificial Intelligence &amp; Machine Learning">B.E. Artificial Intelligence &amp; Machine Learning</option>
+              <option value="B.E. Civil Engineering">B.E. Civil Engineering</option>
+              <option value="B.E. Computer Science &amp; Engineering">B.E. Computer Science &amp; Engineering</option>
+              <option value="B.E. Cyber Security">B.E. Cyber Security</option>
+              <option value="B.E. Electronics &amp; Communication Engineering">B.E. Electronics &amp; Communication Engineering</option>
+              <option value="B.E. Electrical &amp; Electronics Engineering">B.E. Electrical &amp; Electronics Engineering</option>
+              <option value="B.E. Mechanical Engineering">B.E. Mechanical Engineering</option>
+              <option value="B.Tech – Artificial Intelligence &amp; Data Science">B.Tech – Artificial Intelligence &amp; Data Science</option>
+              <option value="B.Tech – Information Technology">B.Tech – Information Technology</option>
+            </optgroup>
+            <optgroup label="🎓 PG Courses">
+              <option value="M.B.A">M.B.A</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="field">
+          <label for="date">Date <span style="color:#c0392b;">*</span></label>
+          <input id="date" type="date" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="head">Name of the Head <span style="color:#c0392b;">*</span></label>
+        <input id="head" type="text" placeholder="Auto-filled after selecting department" readonly />
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="totalstaff">Total No. of Staff</label>
+          <input id="totalstaff" type="number" min="0" placeholder="Auto-filled" readonly />
+        </div>
+        <div class="field">
+          <label for="staffpresent">Total Staff Present</label>
+          <input id="staffpresent" type="number" min="0" placeholder="0" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="totalstudents">Total No. of Students</label>
+        <input id="totalstudents" type="number" min="0" placeholder="Auto-filled" readonly />
+      </div>
+      </div>
+
+      <h2 style="margin-top:28px;">Attendance</h2>
+      <p class="sub">Year and section-wise total strength and students present.</p>
+
+      <div class="strength-card" id="deptInfoCard">
+        <div class="strength-card-head">
+          <span>🏛 Department Details <span style="font-weight:500;color:var(--grey);">(permanent — Head, Total Staff &amp; Total Students)</span></span>
+          <span class="strength-status" id="deptInfoStatus">Not saved yet</span>
+        </div>
+        <p class="strength-hint" style="margin:-2px 0 12px;">Choose a department, then enter its Head, Total Staff and Total Students. These are saved permanently and used to auto-fill every future report for this department — update here any time the details change.</p>
+
+        <div class="field" style="margin-bottom:6px;">
+          <label for="deptInfoDeptSelect">Department</label>
+          <select id="deptInfoDeptSelect">
+            <option value="">— Select Department —</option>
+            <optgroup label="🎓 UG Courses">
+              <option value="B.E. Artificial Intelligence &amp; Machine Learning">B.E. Artificial Intelligence &amp; Machine Learning</option>
+              <option value="B.E. Civil Engineering">B.E. Civil Engineering</option>
+              <option value="B.E. Computer Science &amp; Engineering">B.E. Computer Science &amp; Engineering</option>
+              <option value="B.E. Cyber Security">B.E. Cyber Security</option>
+              <option value="B.E. Electronics &amp; Communication Engineering">B.E. Electronics &amp; Communication Engineering</option>
+              <option value="B.E. Electrical &amp; Electronics Engineering">B.E. Electrical &amp; Electronics Engineering</option>
+              <option value="B.E. Mechanical Engineering">B.E. Mechanical Engineering</option>
+              <option value="B.Tech – Artificial Intelligence &amp; Data Science">B.Tech – Artificial Intelligence &amp; Data Science</option>
+              <option value="B.Tech – Information Technology">B.Tech – Information Technology</option>
+            </optgroup>
+            <optgroup label="🎓 PG Courses">
+              <option value="M.B.A">M.B.A</option>
+            </optgroup>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="deptInfoHead">Name of the Head</label>
+          <input id="deptInfoHead" type="text" placeholder="e.g., Dr. A. Kumar" />
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <label for="deptInfoTotalStaff">Total No. of Staff</label>
+            <input id="deptInfoTotalStaff" type="number" min="0" placeholder="0" />
+          </div>
+          <div class="field">
+            <label for="deptInfoTotalStudents">Total No. of Students</label>
+            <input id="deptInfoTotalStudents" type="number" min="0" placeholder="0" />
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary" id="saveDeptInfoBtn" style="height:40px;margin-top:4px;" disabled>💾 Save Department Details</button>
+        <p class="strength-hint" id="deptInfoSummary" style="margin-top:10px;">Choose a department to begin.</p>
+      </div>
+
+      <div class="strength-card" id="classStrengthCard">
+        <div class="strength-card-head">
+          <span>📌 Class Strength <span style="font-weight:500;color:var(--grey);">(set once per academic year, per department)</span></span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span class="strength-status" id="strengthStatus">Not saved yet</span>
+            <span class="admin-badge locked" id="adminBadge">🔒 Admin only</span>
+            <button type="button" class="admin-badge unlocked" id="adminLogoutBtn" style="display:none;border:1px solid #f3c6c6;color:#a33a3a;background:#fdecec;cursor:pointer;">🚪 Logout</button>
+          </span>
+        </div>
+        <p class="strength-hint" id="adminLockNote" style="margin:-2px 0 12px;color:var(--danger);font-weight:600;">🔒 Locked — only the Admin can enter/edit class strength. Press <b>Shift + Alt + A</b>, or tap the college logo (top‑left) 5 times quickly, to unlock.</p>
+
+        <div id="strengthDeptStep">
+          <p class="strength-hint" style="margin:-2px 0 12px;">Choose a department, then for each Year pick <b>Default</b> (no A/B split), <b>A Class</b>, or <b>B Class</b> and enter that section's strength. Saved once per academic year.</p>
+          <div class="field" style="margin-bottom:6px;">
+            <label for="strengthDeptSelect">Department</label>
+            <select id="strengthDeptSelect">
+              <option value="">— Select Department —</option>
+              <optgroup label="🎓 UG Courses">
+                <option value="B.E. Artificial Intelligence &amp; Machine Learning">B.E. Artificial Intelligence &amp; Machine Learning</option>
+                <option value="B.E. Civil Engineering">B.E. Civil Engineering</option>
+                <option value="B.E. Computer Science &amp; Engineering">B.E. Computer Science &amp; Engineering</option>
+                <option value="B.E. Cyber Security">B.E. Cyber Security</option>
+                <option value="B.E. Electronics &amp; Communication Engineering">B.E. Electronics &amp; Communication Engineering</option>
+                <option value="B.E. Electrical &amp; Electronics Engineering">B.E. Electrical &amp; Electronics Engineering</option>
+                <option value="B.E. Mechanical Engineering">B.E. Mechanical Engineering</option>
+                <option value="B.Tech – Artificial Intelligence &amp; Data Science">B.Tech – Artificial Intelligence &amp; Data Science</option>
+                <option value="B.Tech – Information Technology">B.Tech – Information Technology</option>
+              </optgroup>
+              <optgroup label="🎓 PG Courses">
+                <option value="M.B.A">M.B.A</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div id="strengthYearRows" style="margin-top:14px;"></div>
+
+          <button type="button" class="btn btn-secondary" id="saveStrengthBtn" style="height:40px;margin-top:4px;" disabled>💾 Save Class Strength for this Year</button>
+          <p class="strength-hint" id="strengthSummary" style="margin-top:10px;">Choose a department to begin.</p>
+        </div>
+      </div>
+
+      <div class="strength-card" id="adminSubmissionsPanel" style="display:none;">
+        <div class="strength-card-head">
+          <span>🗂 Today's Submissions <span style="font-weight:500;color:var(--grey);">(Admin only)</span></span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <button type="button" class="btn btn-secondary" id="exportExcelBtn" style="height:30px;font-size:11px;padding:0 12px;">⬇ Export to Excel</button>
+            <button type="button" class="btn btn-secondary" id="adminLogoutBtn2" style="height:30px;font-size:11px;padding:0 12px;color:#a33a3a;border-color:#f3c6c6;">🚪 Logout</button>
+          </span>
+        </div>
+        <div id="submissionsList"><p style="margin:4px 0;color:var(--grey);font-size:12.5px;">No submissions yet today.</p></div>
+      </div>
+
+
+      <div id="hodBottomSection">
+      <div class="row2" style="font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.3px;padding:12px 2px 4px;">
+        <span>Present &amp; Absent (fill this every report)</span>
+      </div>
+      <div id="presentFieldsContainer"></div>
+      <div class="form-error" id="formError">⚠️ Please fill in all fields (Apex Training and Remarks are optional) before submitting.</div>
+
+      <h2 style="margin-top:28px;">Talk on a Topic</h2>
+      <p class="sub">Topic explored per year and whether it was covered.</p>
+
+      <div id="talkFieldsContainer"></div>
+
+      <h2 style="margin-top:28px;">⭐ Apex Training</h2>
+      <p class="sub">Trainer name and class hours conducted per year.</p>
+
+      <div id="apexFieldsContainer"></div>
+
+      <h2 style="margin-top:28px;">Remarks</h2>
+      <div class="field">
+        <label for="remarks">Additional Remarks</label>
+        <textarea id="remarks" rows="4" placeholder="Any additional notes..." style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:14px;color:var(--ink);background:#F9FAFC;font-family:inherit;resize:vertical;"></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="submitAppBtn">📤 Report Submit</button>
+        <button class="btn btn-ghost" id="resetBtn">Reset Form</button>
+      </div>
+      </div>
+    </div>
+
+    <!-- PREVIEW -->
+    <div class="preview-wrap" id="pdfPreviewSection">
+      <img id="logoTemplate" alt="" style="display:none" src="data:image/jpeg;base64,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" />
+
+      <!-- PAGE 1 -->
+      <div class="cert-page" id="certPage1">
+        <div class="cert-border-outer">
+          <div class="cert-border-inner">
+
+            <img class="cert-watermark" id="certWatermark1" alt="" />
+
+            <div class="cert-header">
+              <img id="certLogo1" alt="SKP Group of Institutions" />
+              <div class="htext">
+                <h1>S.K.P ENGINEERING COLLEGE</h1>
+                <div class="place">Thiruvannamalai</div>
+              </div>
+            </div>
+
+            <div class="cert-rule"></div>
+
+            <div class="cert-title">HOD'S REPORT</div>
+            <div class="cert-serial">Date: <span id="outDate">__/__/____</span></div>
+
+            <div class="cert-body">
+              <div class="info-grid">
+                <div class="info-row"><span class="info-label">Name of the Department</span><span class="info-value" id="outDept">[Department Name]</span></div>
+                <div class="info-row"><span class="info-label">Name of the Head</span><span class="info-value" id="outHead">[Head Name]</span></div>
+                <div class="info-row"><span class="info-label">Total No. of Staff</span><span class="info-value" id="outTotalStaff">—</span></div>
+                <div class="info-row"><span class="info-label">Total No. of Staff Present</span><span class="info-value" id="outStaffPresent">—</span></div>
+                <div class="info-row"><span class="info-label">Total No. of Students</span><span class="info-value" id="outTotalStudents">—</span></div>
+              </div>
+
+              <div class="section-label">Attendance</div>
+              <table class="report-table">
+                <thead>
+                  <tr><th>Year</th><th>Section</th><th>Total</th><th>Present</th><th>Absent</th><th>Absentees Tracker</th></tr>
+                </thead>
+                <tbody id="attendanceTbody">
+                  <tr class="total-row" id="attendanceTotalRow"><td colspan="2">Total</td><td id="outSumTotal">—</td><td id="outSumPresent">—</td><td id="outSumAbsent">—</td><td>—</td></tr>
+                </tbody>
+              </table>
+
+              <div class="section-label">Talk on a Topic</div>
+              <table class="report-table">
+                <thead>
+                  <tr><th>Year</th><th>Topic Explored</th><th>Status</th></tr>
+                </thead>
+                <tbody id="talkTbody"></tbody>
+              </table>
+            </div>
+
+            <div class="cert-page-footer">Page 1 of 2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE 2 -->
+      <div class="cert-page" id="certPage2">
+        <div class="cert-border-outer">
+          <div class="cert-border-inner">
+
+            <img class="cert-watermark" id="certWatermark2" alt="" />
+
+            <div class="cert-header">
+              <img id="certLogo2" alt="SKP Group of Institutions" />
+              <div class="htext">
+                <h1>S.K.P ENGINEERING COLLEGE</h1>
+                <div class="place">HOD'S Report &mdash; Continued</div>
+              </div>
+            </div>
+
+            <div class="cert-rule"></div>
+
+            <div class="cert-body">
+              <div class="section-label apex-label">⭐ Apex Training</div>
+              <table class="report-table apex-table">
+                <thead>
+                  <tr><th>Year</th><th>Trainer Name</th><th>Class Hours</th></tr>
+                </thead>
+                <tbody id="apexTbody"></tbody>
+              </table>
+
+              <div class="section-label">Remarks</div>
+              <div class="remarks-box" id="outRemarks">—</div>
+            </div>
+
+            <div class="cert-footer">
+              <div class="sig-block">
+                <div class="sig-line"></div>
+                <div class="role">HOD Signature</div>
+              </div>
+              <div class="sig-block">
+                <div class="sig-line"></div>
+                <div class="role">Principal</div>
+                <div class="sub">S.K.P Engineering College</div>
+              </div>
+            </div>
+
+            <div class="cert-bottom-rule"></div>
+            <div class="cert-address">S.K.P Engineering College, Thiruvannamalai &ndash; 606611</div>
+            <div class="cert-page-footer">Page 2 of 2</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <!-- ADMIN LOGIN MODAL -->
+  <div class="admin-modal-overlay" id="adminModalOverlay">
+    <div class="admin-modal-box">
+      <div class="admin-modal-head">
+        <div class="admin-modal-icon">🔒</div>
+        <h3>Admin Login</h3>
+        <p>Enter your admin credentials to unlock class strength editing and the submissions dashboard.</p>
+      </div>
+      <div class="admin-modal-body">
+        <div class="admin-modal-field">
+          <label for="adminUsernameInput">Username</label>
+          <input type="text" id="adminUsernameInput" placeholder="Enter admin username" autocomplete="off" />
+        </div>
+        <div class="admin-modal-field">
+          <label for="adminPasswordInput">Password</label>
+          <input type="password" id="adminPasswordInput" placeholder="Enter admin password" autocomplete="off" />
+        </div>
+        <div class="admin-modal-error" id="adminModalError"></div>
+        <div class="admin-modal-actions">
+          <button type="button" class="btn btn-ghost" id="adminCancelBtn">Cancel</button>
+          <button type="button" class="btn btn-primary" id="adminLoginBtn">Unlock</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS MODAL (replaces browser alert on submit) -->
+  <div class="success-modal-overlay" id="successModalOverlay">
+    <div class="success-modal-box">
+      <div class="success-modal-head">
+        <img class="success-modal-logo" id="successModalLogo" alt="SKP logo" />
+        <div class="success-modal-check">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 13l4 4L19 7" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h3>Application Submitted</h3>
+        <p class="success-dept" id="successModalDept">—</p>
+      </div>
+      <div class="success-modal-body">
+        <p>The Admin will review it in today&rsquo;s submissions.</p>
+        <button type="button" class="btn btn-primary" id="successModalOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  /* ---------------- FIREBASE (SHARED CLOUD SYNC FOR ADMIN-SAVED DATA) ---------------- */
+  const firebaseConfig = {
+    apiKey: "AIzaSyCpLDBX60tEch-DseDl3xx858IFOAHdIbQ",
+    authDomain: "skpec-hod-report-5122.firebaseapp.com",
+    projectId: "skpec-hod-report-5122",
+    storageBucket: "skpec-hod-report-5122.firebasestorage.app",
+    messagingSenderId: "91160394645",
+    appId: "1:91160394645:web:a05867928852f0d64ad49c",
+    measurementId: "G-PRSKQX03SX"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const cloudDb = firebase.firestore();
+  const CLOUD_COLLECTION = "hodReportData";
+  const CLOUD_STRENGTH_DOC = "classStrength";
+  const CLOUD_DEPTINFO_DOC = "deptInfo";
+  let cloudReady = false; // becomes true once the first cloud read completes
+
+  // Pushes a full local object (class strength or department info) up to Firestore so every
+  // device/browser sees the same admin-saved data. Fire-and-forget with a console warning on failure;
+  // the local copy (localStorage) is already saved, so the UI keeps working even if this fails.
+  function pushToCloud(docId, obj){
+    cloudDb.collection(CLOUD_COLLECTION).doc(docId).set({ data: obj })
+      .catch(err => console.error(`Could not sync ${docId} to the cloud:`, err));
+  }
+
+  // Called whenever fresh data arrives from Firestore (first load, or another device's save).
+  // Refreshes whatever's currently on screen so admins/HODs always see the latest saved values.
+  function onCloudDataChanged(){
+    const deptForStrength = strengthDeptSelect ? strengthDeptSelect.value : "";
+    if(deptForStrength) renderStrengthYearRows(deptForStrength);
+    const deptForInfo = deptInfoDeptSelect ? deptInfoDeptSelect.value : "";
+    if(deptForInfo) loadDeptInfoForm(deptForInfo);
+    const reportDept = document.getElementById("dept").value;
+    if(reportDept){
+      loadDeptInfoIntoReportForm(reportDept);
+      update();
+    }
+  }
+
+  function listenToCloudDoc(docId, localKey){
+    cloudDb.collection(CLOUD_COLLECTION).doc(docId).onSnapshot(snap => {
+      if(snap.exists){
+        const remote = snap.data().data || {};
+        localStorage.setItem(localKey, JSON.stringify(remote));
+      }
+      cloudReady = true;
+      onCloudDataChanged();
+    }, err => console.error(`Could not read ${docId} from the cloud:`, err));
+  }
+
+  /* ---------------- YEAR / DEPARTMENT CONFIG ---------------- */
+  const YEAR_LABEL = {1:"Year I",2:"Year II",3:"Year III",4:"Year IV"};
+  const YEAR_SHORT  = {1:"I",2:"II",3:"III",4:"IV"};
+  const MBA_VALUE = "M.B.A";
+
+  function activeYears(deptVal){
+    return deptVal === MBA_VALUE ? [1,2] : [2,3,4];
+  }
+
+  // Reads the selected Absentees Tracker (Yes/No dropdown) for a given Year + Section.
+  // Defaults to false ("No") if nothing is rendered/selected yet.
+  function getAbsenteesTracker(n, sec){
+    const secLower = sec.toLowerCase();
+    const el = document.getElementById(`y${n}${secLower}absentees`);
+    return el ? el.value === "Yes" : false;
+  }
+  function strengthIdsFor(years){ return years.flatMap(n => [`y${n}atotal`, `y${n}btotal`]); }
+  function presentIdsFor(years){ return years.flatMap(n => [`y${n}apresent`, `y${n}bpresent`, `y${n}aabsent`, `y${n}babsent`]); }
+  function talkIdsFor(years){ return years.flatMap(n => [`t${n}topic`, `t${n}status`]); }
+  function apexIdsFor(years){ return years.flatMap(n => [`ap${n}trainer`, `ap${n}hours`]); }
+
+  const requiredIds = ["dept","head","date"];
+  const staticTextIds = ["dept","head","date","totalstaff","staffpresent","totalstudents","remarks"];
+
+  let currentYears = [];
+
+  /* ---------------- DYNAMIC FIELD RENDERING ---------------- */
+  function renderFormFields(years){
+    const presentEl  = document.getElementById("presentFieldsContainer");
+    const talkEl     = document.getElementById("talkFieldsContainer");
+    const apexEl     = document.getElementById("apexFieldsContainer");
+
+    presentEl.innerHTML = years.map(n => `
+      <div class="row2" data-year="${n}">
+        <div class="field-pair" data-year="${n}" data-section="A">
+          <div class="field"><label data-field-type="present">${YEAR_LABEL[n]} – A Class — Present</label><input id="y${n}apresent" type="number" min="0" placeholder="0" /></div>
+          <div class="field"><label data-field-type="absent">${YEAR_LABEL[n]} – A Class — Absent</label><input id="y${n}aabsent" type="number" min="0" placeholder="0" /></div>
+          <div class="field absentees-field">
+            <label data-field-type="absentees" for="y${n}aabsentees">${YEAR_LABEL[n]} – A Class — Absentees Tracker</label>
+            <select id="y${n}aabsentees">
+              <option value="Yes">Yes</option>
+              <option value="No" selected>No</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-pair" data-year="${n}" data-section="B">
+          <div class="field"><label data-field-type="present">${YEAR_LABEL[n]} – B Class — Present</label><input id="y${n}bpresent" type="number" min="0" placeholder="0" /></div>
+          <div class="field"><label data-field-type="absent">${YEAR_LABEL[n]} – B Class — Absent</label><input id="y${n}babsent" type="number" min="0" placeholder="0" /></div>
+          <div class="field absentees-field">
+            <label data-field-type="absentees" for="y${n}babsentees">${YEAR_LABEL[n]} – B Class — Absentees Tracker</label>
+            <select id="y${n}babsentees">
+              <option value="Yes">Yes</option>
+              <option value="No" selected>No</option>
+            </select>
+          </div>
+        </div>
+      </div>`).join("");
+
+    talkEl.innerHTML = years.map(n => `
+      <div class="row2" data-year="${n}">
+        <div class="field"><label>${YEAR_LABEL[n]} — Topic Explored</label><input id="t${n}topic" type="text" placeholder="e.g., Topic Name" /></div>
+        <div class="field">
+          <label for="t${n}status">${YEAR_LABEL[n]} — Status</label>
+          <select id="t${n}status">
+            <option value="">—</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+      </div>`).join("");
+
+    apexEl.innerHTML = years.map(n => `
+      <div class="row2" data-year="${n}">
+        <div class="field"><label>${YEAR_LABEL[n]} — Trainer Name</label><input id="ap${n}trainer" type="text" placeholder="e.g., Trainer Name" /></div>
+        <div class="field"><label>${YEAR_LABEL[n]} — Class Hours</label><input id="ap${n}hours" type="text" placeholder="e.g., 1&2" /></div>
+      </div>`).join("");
+
+    bindDynamicFieldEvents();
+  }
+
+  function bindDynamicFieldEvents(){
+    ["presentFieldsContainer","talkFieldsContainer","apexFieldsContainer"].forEach(cid => {
+      const container = document.getElementById(cid);
+      if(!container) return;
+      container.querySelectorAll("input,select").forEach(el => {
+        const evt = (el.tagName === "SELECT" || el.type === "radio" || el.type === "checkbox") ? "change" : "input";
+        el.addEventListener(evt, () => {
+          if(el.value && String(el.value).trim()) el.classList.remove("invalid");
+          update();
+        });
+      });
+    });
+  }
+
+  function renderOutputTables(years){
+    const attBody = document.getElementById("attendanceTbody");
+    const totalRow = document.getElementById("attendanceTotalRow");
+    attBody.querySelectorAll("tr[data-year]").forEach(tr => tr.remove());
+    years.forEach(n => {
+      ["A","B"].forEach(sec => {
+        const tr = document.createElement("tr");
+        tr.setAttribute("data-year", n);
+        tr.setAttribute("data-section", sec);
+        tr.innerHTML = `<td>${YEAR_LABEL[n]}</td><td>${sec}</td><td id="outY${n}${sec}Total">—</td><td id="outY${n}${sec}Present">—</td><td id="outY${n}${sec}Absent">—</td><td id="outY${n}${sec}AbsList">—</td>`;
+        attBody.insertBefore(tr, totalRow);
+      });
+    });
+
+    document.getElementById("talkTbody").innerHTML = years.map(n =>
+      `<tr data-year="${n}"><td>${YEAR_SHORT[n]}</td><td id="outT${n}Topic">—</td><td id="outT${n}Status">—</td></tr>`
+    ).join("");
+
+    document.getElementById("apexTbody").innerHTML = years.map(n =>
+      `<tr data-year="${n}"><td>${YEAR_SHORT[n]}</td><td id="outAp${n}Trainer">—</td><td id="outAp${n}Hours">—</td></tr>`
+    ).join("");
+  }
+
+  /* ---------------- CLASS STRENGTH (ADMIN-ONLY, PER-YEAR DEFAULT/A/B) ---------------- */
+  const STRENGTH_KEY = "hodReport_classStrength_v3";
+  const strengthStatusEl = document.getElementById("strengthStatus");
+  const strengthDeptSelect = document.getElementById("strengthDeptSelect");
+  const strengthYearRowsEl = document.getElementById("strengthYearRows");
+  const strengthSummaryEl = document.getElementById("strengthSummary");
+  const saveStrengthBtnEl = document.getElementById("saveStrengthBtn");
+
+  // { [year]: { mode: "default"|"A"|"B", values: {default:null|num, A:null|num, B:null|num} } }
+  let strengthDraft = {};
+
+  // Indian academic year runs June -> May, e.g. 12 July 2026 is in "2026-2027".
+  function currentAcademicYear(){
+    const now = new Date();
+    const y = now.getFullYear();
+    return (now.getMonth() >= 5) ? `${y}-${y + 1}` : `${y - 1}-${y}`;
+  }
+
+  function getAllStrength(){
+    try { return JSON.parse(localStorage.getItem(STRENGTH_KEY) || "{}"); }
+    catch(err){ console.error("Could not read saved class strength:", err); return {}; }
+  }
+
+  function setAllStrength(obj){
+    localStorage.setItem(STRENGTH_KEY, JSON.stringify(obj));
+    pushToCloud(CLOUD_STRENGTH_DOC, obj);
+  }
+
+  function getDeptStrength(deptVal){
+    const all = getAllStrength();
+    return all[deptVal] || {};
+  }
+
+  function getYearStrengthData(deptVal, year){
+    if(!deptVal) return null;
+    const deptData = getDeptStrength(deptVal);
+    const ay = currentAcademicYear();
+    const ayData = deptData[ay];
+    if(!ayData || !ayData[year]) return null;
+    return ayData[year];
+  }
+
+  // Used by the report form to pull each year/section's saved total strength.
+  function getSavedTotal(deptVal, year, section){
+    if(!deptVal) return 0;
+    const yd = getYearStrengthData(deptVal, year);
+    if(!yd) return 0;
+    if(yd.default !== null && yd.default !== undefined) return Number(yd.default);
+    const key = String(section).toUpperCase();
+    if(key === "A" && yd.A !== null && yd.A !== undefined) return Number(yd.A);
+    if(key === "B" && yd.B !== null && yd.B !== undefined) return Number(yd.B);
+    return 0;
+  }
+
+  function updateStrengthStatus(deptVal){
+    const ay = currentAcademicYear();
+    if(!deptVal){
+      strengthStatusEl.textContent = "Not saved yet";
+      strengthStatusEl.classList.remove("saved");
+      return;
+    }
+    const deptData = getDeptStrength(deptVal);
+    if(deptData[ay]){
+      strengthStatusEl.textContent = `Saved for this department in AY ${ay}`;
+      strengthStatusEl.classList.add("saved");
+    } else {
+      strengthStatusEl.textContent = "Not saved yet for this department";
+      strengthStatusEl.classList.remove("saved");
+    }
+  }
+
+  function loadStrengthDraft(deptVal){
+    strengthDraft = {};
+    const years = activeYears(deptVal);
+    const deptData = getDeptStrength(deptVal);
+    const ay = currentAcademicYear();
+    const ayData = deptData[ay] || {};
+    years.forEach(n => {
+      const yd = ayData[n] || {};
+      const defaultVal = yd.default !== undefined ? yd.default : null;
+      const aVal = yd.A !== undefined ? yd.A : null;
+      const bVal = yd.B !== undefined ? yd.B : null;
+      const mode = defaultVal !== null ? "default" : (aVal !== null ? "A" : (bVal !== null ? "B" : "default"));
+      strengthDraft[n] = { mode, values: { default: defaultVal, A: aVal, B: bVal } };
+    });
+    return years;
+  }
+
+  function renderStrengthYearRows(deptVal){
+    if(!deptVal){
+      strengthYearRowsEl.innerHTML = "";
+      saveStrengthBtnEl.disabled = true;
+      strengthSummaryEl.textContent = "Choose a department to begin.";
+      updateStrengthStatus(deptVal);
+      return;
+    }
+
+    const years = loadStrengthDraft(deptVal);
+
+    strengthYearRowsEl.innerHTML = years.map(n => `
+      <div class="strength-year-row" data-year="${n}">
+        <span class="strength-year-label">${YEAR_LABEL[n]}</span>
+        <select class="strength-mode-select" data-year="${n}">
+          <option value="default">Default</option>
+          <option value="A">A Class</option>
+          <option value="B">B Class</option>
+        </select>
+        <input type="number" min="0" class="strength-value-input" data-year="${n}" placeholder="Enter class strength" />
+      </div>
+    `).join("");
+
+    years.forEach(n => {
+      const modeSel = strengthYearRowsEl.querySelector(`.strength-mode-select[data-year="${n}"]`);
+      const valInput = strengthYearRowsEl.querySelector(`.strength-value-input[data-year="${n}"]`);
+
+      modeSel.value = strengthDraft[n].mode;
+      const currentVal = strengthDraft[n].values[strengthDraft[n].mode];
+      valInput.value = currentVal !== null && currentVal !== undefined ? currentVal : "";
+      modeSel.disabled = !isAdmin;
+      valInput.disabled = !isAdmin;
+
+      modeSel.addEventListener("change", () => {
+        strengthDraft[n].mode = modeSel.value;
+        const v = strengthDraft[n].values[modeSel.value];
+        valInput.value = v !== null && v !== undefined ? v : "";
+      });
+
+      valInput.addEventListener("input", () => {
+        const raw = valInput.value.trim();
+        strengthDraft[n].values[strengthDraft[n].mode] = raw === "" ? null : Number(raw);
+      });
+    });
+
+    saveStrengthBtnEl.disabled = !isAdmin;
+    strengthSummaryEl.textContent = `Current AY ${currentAcademicYear()} • set each Year's strength, then Save.`;
+    updateStrengthStatus(deptVal);
+  }
+
+  function saveStrength(){
+    if(!isAdmin){ openAdminModal(); return; }
+
+    const deptVal = strengthDeptSelect.value.trim();
+    if(!deptVal){ alert("Please choose a department first."); return; }
+
+    const years = activeYears(deptVal);
+    for(const n of years){
+      const d = strengthDraft[n];
+      if(!d || (d.values.default === null && d.values.A === null && d.values.B === null)){
+        alert(`Please enter class strength for ${YEAR_LABEL[n]} (Default, A Class, or B Class).`);
+        return;
+      }
+      const v = d.values[d.mode];
+      if(!Number.isFinite(v) || v < 0){
+        alert(`Please enter a valid non-negative strength for ${YEAR_LABEL[n]}.`);
+        return;
+      }
+    }
+
+    const ay = currentAcademicYear();
+    const all = getAllStrength();
+    const deptData = all[deptVal] || {};
+    const alreadySavedForAY = !!deptData[ay];
+
+    if(alreadySavedForAY){
+      const proceed = confirm(`${deptVal} was already saved for AY ${ay}.\n\nDo you want to overwrite it now?`);
+      if(!proceed) return;
+    }
+
+    const ayData = {};
+    years.forEach(n => {
+      ayData[n] = {
+        default: strengthDraft[n].values.default,
+        A: strengthDraft[n].values.A,
+        B: strengthDraft[n].values.B
+      };
+    });
+    deptData[ay] = ayData;
+    deptData.__savedOn = new Date().toLocaleDateString("en-GB");
+    deptData.__academicYear = ay;
+    all[deptVal] = deptData;
+
+    try {
+      setAllStrength(all);
+      strengthSummaryEl.textContent = `Saved class strength for ${deptVal} in AY ${ay}.`;
+      updateStrengthStatus(deptVal);
+      const originalLabel = saveStrengthBtnEl.textContent;
+      saveStrengthBtnEl.textContent = "✅ Saved";
+      setTimeout(() => { saveStrengthBtnEl.textContent = originalLabel; }, 1800);
+    } catch(err){
+      alert("Could not save class strength on this device/browser.");
+      console.error(err);
+    }
+  }
+
+  // Hides the A/B (or shows a single combined "Class") Present/Absent fields on the
+  // HOD report form and output tables, based on what's saved for each year.
+  function applySectionVisibility(deptVal, years){
+    years.forEach(n => {
+      const yd = getYearStrengthData(deptVal, n) || {};
+      const hasDefault = yd.default !== null && yd.default !== undefined;
+      const hasA = yd.A !== null && yd.A !== undefined;
+      const hasB = yd.B !== null && yd.B !== undefined;
+      const nothingSaved = !hasDefault && !hasA && !hasB;
+
+      const showA = hasDefault || hasA || nothingSaved;
+      const showB = hasB || nothingSaved;
+
+      const aWrap = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="A"]`);
+      const bWrap = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="B"]`);
+      if(aWrap){
+        aWrap.style.display = showA ? "" : "none";
+        const classLabel = (hasDefault && !hasA) ? `${YEAR_LABEL[n]} – Class` : `${YEAR_LABEL[n]} – A Class`;
+        aWrap.querySelectorAll("label").forEach(l => {
+          const type = l.dataset.fieldType;
+          if(type === "present") l.textContent = `${classLabel} — Present`;
+          else if(type === "absent") l.textContent = `${classLabel} — Absent`;
+          else if(type === "absentees") l.textContent = `${classLabel} — Absentees Tracker`;
+        });
+      }
+      if(bWrap) bWrap.style.display = showB ? "" : "none";
+
+      const attRowA = document.querySelector(`#attendanceTbody tr[data-year="${n}"][data-section="A"]`);
+      const attRowB = document.querySelector(`#attendanceTbody tr[data-year="${n}"][data-section="B"]`);
+      if(attRowA){
+        attRowA.style.display = showA ? "" : "none";
+        const sectionCell = attRowA.children[1];
+        if(sectionCell) sectionCell.textContent = (hasDefault && !hasA) ? "—" : "A";
+      }
+      if(attRowB) attRowB.style.display = showB ? "" : "none";
+    });
+  }
+
+  saveStrengthBtnEl.addEventListener("click", saveStrength);
+
+  strengthDeptSelect.addEventListener("change", () => {
+    renderStrengthYearRows(strengthDeptSelect.value);
+  });
+
+  /* ---------------- DEPARTMENT DETAILS (ADMIN-ONLY, PERMANENT: HEAD / TOTAL STAFF / TOTAL STUDENTS) ---------------- */
+  const DEPT_INFO_KEY = "hodReport_deptInfo_v1";
+  const deptInfoDeptSelect   = document.getElementById("deptInfoDeptSelect");
+  const deptInfoHeadEl       = document.getElementById("deptInfoHead");
+  const deptInfoStaffEl      = document.getElementById("deptInfoTotalStaff");
+  const deptInfoStudentsEl   = document.getElementById("deptInfoTotalStudents");
+  const saveDeptInfoBtnEl    = document.getElementById("saveDeptInfoBtn");
+  const deptInfoStatusEl     = document.getElementById("deptInfoStatus");
+  const deptInfoSummaryEl    = document.getElementById("deptInfoSummary");
+
+  function getAllDeptInfo(){
+    try { return JSON.parse(localStorage.getItem(DEPT_INFO_KEY) || "{}"); }
+    catch(err){ console.error("Could not read saved department details:", err); return {}; }
+  }
+
+  function setAllDeptInfo(obj){
+    localStorage.setItem(DEPT_INFO_KEY, JSON.stringify(obj));
+    pushToCloud(CLOUD_DEPTINFO_DOC, obj);
+  }
+
+  // Fetch a single department's permanent details by Department Name (acts as the Department ID here).
+  function getDeptInfo(deptVal){
+    if(!deptVal) return null;
+    const all = getAllDeptInfo();
+    return all[deptVal] || null;
+  }
+
+  function updateDeptInfoStatus(deptVal){
+    if(!deptVal){
+      deptInfoStatusEl.textContent = "Not saved yet";
+      deptInfoStatusEl.classList.remove("saved");
+      return;
+    }
+    const info = getDeptInfo(deptVal);
+    if(info){
+      deptInfoStatusEl.textContent = `Saved for ${deptVal}`;
+      deptInfoStatusEl.classList.add("saved");
+    } else {
+      deptInfoStatusEl.textContent = "Not saved yet for this department";
+      deptInfoStatusEl.classList.remove("saved");
+    }
+  }
+
+  // Populates the Admin panel's Department Details form (create-or-edit), keyed by department so there
+  // is always exactly one record per department — saving again simply updates it (no duplicates).
+  function loadDeptInfoForm(deptVal){
+    if(!deptVal){
+      deptInfoHeadEl.value = "";
+      deptInfoStaffEl.value = "";
+      deptInfoStudentsEl.value = "";
+      saveDeptInfoBtnEl.disabled = true;
+      deptInfoSummaryEl.textContent = "Choose a department to begin.";
+      updateDeptInfoStatus(deptVal);
+      return;
+    }
+    const info = getDeptInfo(deptVal);
+    deptInfoHeadEl.value     = info ? (info.head || "") : "";
+    deptInfoStaffEl.value    = (info && info.totalStaff !== undefined && info.totalStaff !== null) ? info.totalStaff : "";
+    deptInfoStudentsEl.value = (info && info.totalStudents !== undefined && info.totalStudents !== null) ? info.totalStudents : "";
+    saveDeptInfoBtnEl.disabled = !isAdmin;
+    deptInfoSummaryEl.textContent = info
+      ? "Loaded existing details for this department — edit and Save to update."
+      : "No details saved yet for this department — fill in and Save.";
+    updateDeptInfoStatus(deptVal);
+  }
+
+  function saveDeptInfo(){
+    if(!isAdmin){ openAdminModal(); return; }
+
+    const deptVal = deptInfoDeptSelect.value.trim();
+    if(!deptVal){ alert("Please choose a department first."); return; }
+
+    const head = deptInfoHeadEl.value.trim();
+    const totalStaffRaw = deptInfoStaffEl.value.trim();
+    const totalStudentsRaw = deptInfoStudentsEl.value.trim();
+
+    if(!head){ alert("Please enter the Name of the Head."); deptInfoHeadEl.focus(); return; }
+    const totalStaffNum = Number(totalStaffRaw);
+    if(totalStaffRaw === "" || !Number.isFinite(totalStaffNum) || totalStaffNum < 0){
+      alert("Please enter a valid non-negative Total No. of Staff.");
+      deptInfoStaffEl.focus();
+      return;
+    }
+    const totalStudentsNum = Number(totalStudentsRaw);
+    if(totalStudentsRaw === "" || !Number.isFinite(totalStudentsNum) || totalStudentsNum < 0){
+      alert("Please enter a valid non-negative Total No. of Students.");
+      deptInfoStudentsEl.focus();
+      return;
+    }
+
+    // Keyed by department name, so re-saving the same department updates the one existing
+    // record instead of creating a duplicate.
+    const all = getAllDeptInfo();
+    all[deptVal] = {
+      head,
+      totalStaff: totalStaffNum,
+      totalStudents: totalStudentsNum,
+      updatedOn: new Date().toLocaleString("en-GB")
+    };
+
+    try {
+      setAllDeptInfo(all);
+      deptInfoSummaryEl.textContent = `Saved department details for ${deptVal}.`;
+      updateDeptInfoStatus(deptVal);
+      const originalLabel = saveDeptInfoBtnEl.textContent;
+      saveDeptInfoBtnEl.textContent = "✅ Saved";
+      setTimeout(() => { saveDeptInfoBtnEl.textContent = originalLabel; }, 1800);
+
+      // If the report form already has this department selected, refresh its auto-filled fields right away.
+      if(document.getElementById("dept").value === deptVal){
+        loadDeptInfoIntoReportForm(deptVal);
+        update();
+      }
+    } catch(err){
+      alert("Could not save department details on this device/browser.");
+      console.error(err);
+    }
+  }
+
+  saveDeptInfoBtnEl.addEventListener("click", saveDeptInfo);
+  deptInfoDeptSelect.addEventListener("change", () => loadDeptInfoForm(deptInfoDeptSelect.value));
+
+  // Reads the permanently saved department details and prefills the read-only Report Details
+  // fields (Name of the Head / Total No. of Staff / Total No. of Students). "Total Staff Present"
+  // is left untouched since it's entered fresh for every report.
+  function loadDeptInfoIntoReportForm(deptVal){
+    const headEl     = document.getElementById("head");
+    const staffEl     = document.getElementById("totalstaff");
+    const studentsEl = document.getElementById("totalstudents");
+    const info = getDeptInfo(deptVal);
+
+    headEl.value     = info ? (info.head || "") : "";
+    staffEl.value    = (info && info.totalStaff !== undefined && info.totalStaff !== null) ? info.totalStaff : "";
+    studentsEl.value = (info && info.totalStudents !== undefined && info.totalStudents !== null) ? info.totalStudents : "";
+
+    [headEl, staffEl, studentsEl].forEach(el => {
+      if(el.value.toString().trim()) el.classList.remove("invalid");
+    });
+  }
+
+  /* ---------------- DEPARTMENT CHANGE ORCHESTRATION (HOD report form) ---------------- */
+  function applyDeptChange(){
+    const deptVal = document.getElementById("dept").value;
+    const years = activeYears(deptVal);
+    const changed = JSON.stringify(years) !== JSON.stringify(currentYears);
+    if(changed){
+      currentYears = years;
+      renderFormFields(years);
+      renderOutputTables(years);
+      updateAdminUI();
+    }
+    applySectionVisibility(deptVal, years);
+    loadDeptInfoIntoReportForm(deptVal);
+    update();
+  }
+
+  /* ---------------- ADMIN LOGIN ---------------- */
+  const ADMIN_USERNAME = "principal@skpec.in"; // change this to whatever you like
+  const ADMIN_PASSWORD = "Skpec*1234";         // change this to whatever you like
+  const ADMIN_SESSION_KEY = "hodReport_adminSession_v1";
+  let isAdmin = sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
+
+  const adminOverlay   = document.getElementById("adminModalOverlay");
+  const adminUserInput = document.getElementById("adminUsernameInput");
+  const adminPassInput = document.getElementById("adminPasswordInput");
+  const adminError     = document.getElementById("adminModalError");
+  const adminBadge     = document.getElementById("adminBadge");
+  const adminLockNote  = document.getElementById("adminLockNote");
+  const adminLogoutBtn  = document.getElementById("adminLogoutBtn");
+  const adminLogoutBtn2 = document.getElementById("adminLogoutBtn2");
+
+  function updateAdminUI(){
+    saveStrengthBtnEl.disabled = !isAdmin;
+    document.getElementById("classStrengthCard").style.display = isAdmin ? "" : "none";
+    document.getElementById("deptInfoCard").style.display = isAdmin ? "" : "none";
+    if(isAdmin){
+      adminBadge.textContent = "🔓 Admin — tap to lock";
+      adminBadge.className = "admin-badge unlocked";
+      adminLockNote.style.display = "none";
+      if(adminLogoutBtn) adminLogoutBtn.style.display = "";
+      strengthDeptSelect.disabled = false;
+      renderStrengthYearRows(strengthDeptSelect.value || "");
+      deptInfoDeptSelect.disabled = false;
+      loadDeptInfoForm(deptInfoDeptSelect.value || "");
+    } else {
+      adminBadge.textContent = "🔒 Admin only";
+      adminBadge.className = "admin-badge locked";
+      adminLockNote.style.display = "";
+      if(adminLogoutBtn) adminLogoutBtn.style.display = "none";
+      strengthDeptSelect.disabled = true;
+      strengthYearRowsEl.innerHTML = "";
+      saveStrengthBtnEl.disabled = true;
+      strengthStatusEl.textContent = "Locked — admin login required";
+      strengthStatusEl.classList.remove("saved");
+      deptInfoDeptSelect.disabled = true;
+      deptInfoHeadEl.value = "";
+      deptInfoStaffEl.value = "";
+      deptInfoStudentsEl.value = "";
+      saveDeptInfoBtnEl.disabled = true;
+      deptInfoStatusEl.textContent = "Locked — admin login required";
+      deptInfoStatusEl.classList.remove("saved");
+    }
+    document.getElementById("hodTopSection").style.display = isAdmin ? "none" : "";
+    document.getElementById("hodBottomSection").style.display = isAdmin ? "none" : "";
+    document.getElementById("pdfPreviewSection").style.display = isAdmin ? "none" : "";
+    document.getElementById("adminSubmissionsPanel").style.display = isAdmin ? "" : "none";
+    renderSubmissionsPanel();
+  }
+
+  /* ---------------- SUBMISSIONS (HOD → Admin) ---------------- */
+  const SUBMISSIONS_KEY = "hodReport_submissions_v1";
+  const SUBMISSION_EXPIRY_HOUR = 9; // submissions auto-clear at 9:00 AM the day after their report date
+
+  function todayStr(){ return new Date().toLocaleDateString("en-GB"); } // dd/mm/yyyy
+
+  function getSubmissions(){
+    try { return JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) || "[]"); }
+    catch(e){ return []; }
+  }
+  function setSubmissions(list){
+    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(list));
+  }
+  function parseDMY(dateStr){
+    const [d, m, y] = String(dateStr).split("/").map(Number);
+    if(!d || !m || !y) return null;
+    return new Date(y, m - 1, d);
+  }
+  function submissionExpiry(dateStr){
+    const base = parseDMY(dateStr);
+    if(!base) return null;
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1, SUBMISSION_EXPIRY_HOUR, 0, 0, 0);
+  }
+  function isSubmissionActive(s){
+    const expiry = submissionExpiry(s.date);
+    if(!expiry) return true; // malformed date — don't accidentally wipe it
+    return new Date() < expiry;
+  }
+  // Deletes submissions from storage once they've passed 9:00 AM the day after their report date.
+  function purgeExpiredSubmissions(){
+    const all = getSubmissions();
+    const kept = all.filter(isSubmissionActive);
+    if(kept.length !== all.length){
+      setSubmissions(kept);
+      return true;
+    }
+    return false;
+  }
+  function escapeHtml(str){
+    return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  async function buildReportPdf(){
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const pageEls = [document.getElementById("certPage1"), document.getElementById("certPage2")];
+    for (let i = 0; i < pageEls.length; i++){
+      const canvas = await html2canvas(pageEls[i], { scale: 3, backgroundColor: "#FFFFFF" });
+      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+      const imgH = (canvas.height * pageW) / canvas.width;
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, "JPEG", 0, 0, pageW, Math.min(imgH, pageH));
+    }
+    return pdf;
+  }
+
+  function renderSubmissionsPanel(){
+    if(!isAdmin) return;
+    purgeExpiredSubmissions();
+    const listEl = document.getElementById("submissionsList");
+    const todays = getSubmissions().filter(isSubmissionActive);
+    if(todays.length === 0){
+      listEl.innerHTML = '<p style="margin:4px 0;color:var(--grey);font-size:12.5px;">No submissions yet today.</p>';
+      return;
+    }
+    listEl.innerHTML = todays.map(s => {
+      const rows = (s.attendance || []).map(r => {
+        const absentVal = (r.absent !== undefined && r.absent !== null) ? r.absent : Math.max((r.total||0) - (r.present||0), 0);
+        const absList = r.absenteesTracker ? "Yes" : "No";
+        return `
+        <tr><td>${escapeHtml(r.year)}</td><td>${escapeHtml(r.section)}</td><td>${escapeHtml(r.total)}</td><td>${escapeHtml(r.present)}</td><td>${escapeHtml(absentVal)}</td><td>${escapeHtml(absList)}</td></tr>
+      `;
+      }).join("");
+      return `
+      <div class="sub-row">
+        <div class="sub-row-head">
+          <div class="sub-dept">${escapeHtml(s.dept)}</div>
+          <button type="button" class="viewSubBtn" data-id="${escapeHtml(s.id)}">👁 View PDF</button>
+        </div>
+        <table class="sub-attendance-table">
+          <thead><tr><th>Year</th><th>Section</th><th>Total Strength</th><th>Present</th><th>Absent</th><th>Absentees Tracker</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="6">—</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+    }).join("");
+    listEl.querySelectorAll(".viewSubBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const rec = getSubmissions().find(x => x.id === btn.dataset.id);
+        if(rec && rec.pdfDataUrl){
+          const w = window.open();
+          if(w) w.document.write(`<iframe src="${rec.pdfDataUrl}" style="border:0;width:100%;height:100vh;"></iframe>`);
+        }
+      });
+    });
+  }
+
+  document.getElementById("exportExcelBtn").addEventListener("click", () => {
+    purgeExpiredSubmissions();
+    const today = todayStr();
+    const todays = getSubmissions().filter(isSubmissionActive);
+    if(todays.length === 0){ alert("No submissions to export today."); return; }
+    // Short, tidy format: one row per Year-Section that was actually filled in.
+    // No blank/placeholder columns are created for sections nobody submitted.
+    const rows = [];
+    todays.forEach(s => {
+      const att = s.attendance || [];
+      if(att.length === 0){
+        rows.push({
+          "Dept Name": s.dept,
+          "Head Name": s.head,
+          "Total Staff": s.totalStaff,
+          "Total Students": s.totalStudents,
+          "Year": "—",
+          "Section": "—",
+          "Total Strength": "—",
+          "Present": "—",
+          "Absent": "—",
+          "Attendance %": "—",
+          "Absentees Tracker": "—",
+          "Report Date": s.date,
+          "Submitted On": s.submittedOn
+        });
+        return;
+      }
+      att.forEach(r => {
+        const absentVal = (r.absent !== undefined && r.absent !== null) ? r.absent : Math.max((r.total||0) - (r.present||0), 0);
+        const pct = r.total ? ((r.present / r.total) * 100).toFixed(1) + "%" : "—";
+        rows.push({
+          "Dept Name": s.dept,
+          "Head Name": s.head,
+          "Total Staff": s.totalStaff,
+          "Total Students": s.totalStudents,
+          "Year": r.year,
+          "Section": r.section,
+          "Total Strength": r.total,
+          "Present": r.present,
+          "Absent": absentVal,
+          "Attendance %": pct,
+          "Absentees Tracker": r.absenteesTracker ? "Yes" : "No",
+          "Report Date": s.date,
+          "Submitted On": s.submittedOn
+        });
+      });
+    });
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 22 }, { wch: 20 }, { wch: 11 }, { wch: 13 }, { wch: 8 },
+      { wch: 9 }, { wch: 14 }, { wch: 9 }, { wch: 9 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Submissions");
+    XLSX.writeFile(wb, `HOD_Submissions_${today.replace(/\//g,"-")}.xlsx`);
+  });
+
+  document.getElementById("submitAppBtn").addEventListener("click", async () => {
+    if(!validateForm()) return;
+    const deptVal = document.getElementById("dept").value.trim();
+    const today = todayStr();
+    const submissions = getSubmissions();
+    const already = submissions.find(s => s.dept.trim().toLowerCase() === deptVal.toLowerCase() && s.date === today);
+    if(already){
+      alert(`⚠️ "${deptVal}" department has already submitted today's report (${today}).\nYou can submit again tomorrow.`);
+      return;
+    }
+    const btn = document.getElementById("submitAppBtn");
+    const original = btn.textContent;
+    btn.textContent = "Submitting…";
+    btn.disabled = true;
+    try {
+      const pdf = await buildReportPdf();
+      const pdfDataUrl = pdf.output("datauristring");
+      const attendance = currentYears.flatMap(n => ["A","B"].map(sec => {
+        const secLower = sec.toLowerCase();
+        const wrapper = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="${sec}"]`);
+        const visible = !wrapper || wrapper.style.display !== "none";
+        const total = getSavedTotal(deptVal, n, sec);
+        const present = num(`y${n}${secLower}present`);
+        const absentEl = document.getElementById(`y${n}${secLower}absent`);
+        const absentRaw = absentEl ? absentEl.value : "";
+        const absent = absentRaw !== "" ? Number(absentRaw) : Math.max(total - present, 0);
+        return {
+          year: YEAR_LABEL[n],
+          section: sec,
+          total,
+          present,
+          absent,
+          absenteesTracker: getAbsenteesTracker(n, sec),
+          visible
+        };
+      })).filter(r => r.visible);
+      submissions.push({
+        id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+        dept: deptVal,
+        head: document.getElementById("head").value.trim(),
+        date: today,
+        totalStudents: document.getElementById("totalstudents").value || "—",
+        totalStaff: document.getElementById("totalstaff").value || "—",
+        submittedOn: new Date().toLocaleString("en-GB"),
+        attendance,
+        pdfDataUrl
+      });
+      setSubmissions(submissions);
+      btn.textContent = "✅ Submitted!";
+      openSuccessModal(deptVal);
+      renderSubmissionsPanel();
+      setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
+    } catch(err){
+      alert("Could not submit the application. Please try again.");
+      console.error(err);
+      btn.textContent = original;
+      btn.disabled = false;
+    }
+  });
+
+  const successOverlay  = document.getElementById("successModalOverlay");
+  const successDeptEl   = document.getElementById("successModalDept");
+  const successOkBtn    = document.getElementById("successModalOkBtn");
+
+  function openSuccessModal(deptVal){
+    successDeptEl.textContent = deptVal;
+    successOverlay.classList.add("open");
+    setTimeout(() => successOkBtn.focus(), 50);
+  }
+  function closeSuccessModal(){
+    successOverlay.classList.remove("open");
+  }
+  successOkBtn.addEventListener("click", closeSuccessModal);
+  successOverlay.addEventListener("click", (e) => { if(e.target === successOverlay) closeSuccessModal(); });
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape" && successOverlay.classList.contains("open")) closeSuccessModal(); });
+
+  function openAdminModal(){
+    adminError.textContent = "";
+    adminUserInput.value = "";
+    adminPassInput.value = "";
+    adminOverlay.classList.add("open");
+    setTimeout(() => adminUserInput.focus(), 50);
+  }
+  function closeAdminModal(){
+    adminOverlay.classList.remove("open");
+  }
+  function attemptAdminLogin(){
+    if(adminUserInput.value.trim() === ADMIN_USERNAME && adminPassInput.value === ADMIN_PASSWORD){
+      isAdmin = true;
+      sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+      updateAdminUI();
+      closeAdminModal();
+    } else {
+      adminError.textContent = "Incorrect username or password. Please try again.";
+      adminPassInput.value = "";
+      adminUserInput.focus();
+    }
+  }
+  function adminLogout(){
+    isAdmin = false;
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    updateAdminUI();
+  }
+
+  document.getElementById("adminLoginBtn").addEventListener("click", attemptAdminLogin);
+  document.getElementById("adminCancelBtn").addEventListener("click", closeAdminModal);
+  adminUserInput.addEventListener("keydown", (e) => { if(e.key === "Enter") adminPassInput.focus(); });
+  adminPassInput.addEventListener("keydown", (e) => { if(e.key === "Enter") attemptAdminLogin(); });
+  adminOverlay.addEventListener("click", (e) => { if(e.target === adminOverlay) closeAdminModal(); });
+  document.addEventListener("keydown", (e) => { if(e.key === "Escape" && adminOverlay.classList.contains("open")) closeAdminModal(); });
+
+  adminBadge.addEventListener("click", () => { if(isAdmin) adminLogout(); });
+  if(adminLogoutBtn)  adminLogoutBtn.addEventListener("click", adminLogout);
+  if(adminLogoutBtn2) adminLogoutBtn2.addEventListener("click", adminLogout);
+
+  // Shortcut: Shift + Alt + A
+  document.addEventListener("keydown", (e) => {
+    if(e.shiftKey && e.altKey && (e.key === "A" || e.key === "a")){
+      e.preventDefault();
+      if(isAdmin){ adminLogout(); } else { openAdminModal(); }
+    }
+  });
+
+  // Logo: 5 quick clicks
+  (function setupLogoUnlock(){
+    const logo = document.getElementById("brandLogo");
+    if(!logo) return;
+    let clickCount = 0;
+    let resetTimer = null;
+    logo.addEventListener("click", () => {
+      clickCount++;
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => { clickCount = 0; }, 1500);
+      if(clickCount >= 5){
+        clickCount = 0;
+        clearTimeout(resetTimer);
+        if(!isAdmin) openAdminModal();
+      }
+    });
+  })();
+
+  function fmtDate(v){
+    if(!v) return "__/__/____";
+    const [y,m,d] = v.split("-");
+    return `${d}/${m}/${y}`;
+  }
+
+  function num(id){
+    const el = document.getElementById(id);
+    if(!el) return 0;
+    const v = el.value;
+    return v === "" ? 0 : Number(v);
+  }
+
+  function textOrDash(id, fallback){
+    const el = document.getElementById(id);
+    if(!el) return fallback;
+    const v = el.value.trim();
+    return v || fallback;
+  }
+
+  function update(){
+    document.getElementById("outDept").textContent = textOrDash("dept", "[Department Name]");
+    document.getElementById("outHead").textContent = textOrDash("head", "[Head Name]");
+    document.getElementById("outDate").textContent = fmtDate(document.getElementById("date").value);
+
+    document.getElementById("outTotalStaff").textContent = document.getElementById("totalstaff").value || "—";
+    document.getElementById("outStaffPresent").textContent = document.getElementById("staffpresent").value || "—";
+    document.getElementById("outTotalStudents").textContent = document.getElementById("totalstudents").value || "—";
+
+    const mainDeptVal = document.getElementById("dept").value;
+    let sumTotal = 0, sumPresent = 0, sumAbsent = 0, haveAnyAbsent = false;
+    currentYears.forEach(n => {
+      ["A","B"].forEach(sec => {
+        const secLower = sec.toLowerCase();
+        const pId = `y${n}${secLower}present`;
+        const aId = `y${n}${secLower}absent`;
+        const pEl = document.getElementById(pId);
+        const aEl = document.getElementById(aId);
+        if(!pEl) return;
+        const t = getSavedTotal(mainDeptVal, n, sec), p = num(pId);
+        const aRaw = aEl ? aEl.value : "";
+        const enteredAbsent = aRaw !== "" ? Number(aRaw) : null;
+        const a = enteredAbsent !== null ? enteredAbsent : (t ? Math.max(t - p, 0) : 0);
+        sumTotal += t;
+        sumPresent += p;
+        sumAbsent += a;
+        if(enteredAbsent !== null) haveAnyAbsent = true;
+        const outTEl = document.getElementById(`outY${n}${sec}Total`);
+        if(outTEl){
+          outTEl.textContent = t || "—";
+          document.getElementById(`outY${n}${sec}Present`).textContent = pEl.value || "—";
+          document.getElementById(`outY${n}${sec}Absent`).textContent = (enteredAbsent !== null) ? aRaw : (t ? a : "—");
+          const absListEl = document.getElementById(`outY${n}${sec}AbsList`);
+          if(absListEl) absListEl.textContent = getAbsenteesTracker(n, sec) ? "Yes" : "No";
+        }
+      });
+    });
+
+    document.getElementById("outSumTotal").textContent = sumTotal || "—";
+    document.getElementById("outSumPresent").textContent = sumPresent || "—";
+    document.getElementById("outSumAbsent").textContent = (haveAnyAbsent || sumTotal) ? sumAbsent : "—";
+
+    currentYears.forEach(n => {
+      const topicOutEl = document.getElementById(`outT${n}Topic`);
+      if(topicOutEl){
+        topicOutEl.textContent = textOrDash(`t${n}topic`, "—");
+        document.getElementById(`outT${n}Status`).textContent = textOrDash(`t${n}status`, "—");
+      }
+      const trainerOutEl = document.getElementById(`outAp${n}Trainer`);
+      if(trainerOutEl){
+        trainerOutEl.textContent = textOrDash(`ap${n}trainer`, "—");
+        document.getElementById(`outAp${n}Hours`).textContent = (document.getElementById(`ap${n}hours`) || {}).value || "—";
+      }
+    });
+
+    document.getElementById("outRemarks").textContent = textOrDash("remarks", "—");
+  }
+
+  staticTextIds.forEach(id => {
+    const el = document.getElementById(id);
+    const evt = el.tagName === "SELECT" ? "change" : "input";
+    el.addEventListener(evt, () => {
+      if(el.value.trim()) el.classList.remove("invalid");
+      update();
+    });
+  });
+
+  document.getElementById("dept").addEventListener("change", applyDeptChange);
+
+  const formErrorEl = document.getElementById("formError");
+
+  // Apex Training and Remarks are the only optional sections — everything else must be filled in before submitting.
+  function collectRequiredIds(){
+    const ids = [...requiredIds, "totalstaff", "staffpresent", "totalstudents"];
+
+    currentYears.forEach(n => {
+      ["A","B"].forEach(sec => {
+        const secLower = sec.toLowerCase();
+        const wrapper = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="${sec}"]`);
+        const visible = wrapper && wrapper.style.display !== "none";
+        if(visible){
+          ids.push(`y${n}${secLower}present`);
+          ids.push(`y${n}${secLower}absent`);
+        }
+      });
+      ids.push(`t${n}topic`);
+      ids.push(`t${n}status`);
+    });
+
+    return ids;
+  }
+
+  function validateForm(){
+    let valid = true;
+    let firstInvalid = null;
+
+    collectRequiredIds().forEach(id => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      if(!el.value.trim()){
+        el.classList.add("invalid");
+        valid = false;
+        if(!firstInvalid) firstInvalid = el;
+      } else {
+        el.classList.remove("invalid");
+      }
+    });
+
+    if(valid){
+      formErrorEl.classList.remove("show");
+    } else {
+      formErrorEl.classList.add("show");
+      if(firstInvalid){
+        firstInvalid.focus();
+        firstInvalid.scrollIntoView({ behavior:"smooth", block:"center" });
+      }
+    }
+    return valid;
+  }
+
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    staticTextIds.forEach(id => {
+      const el = document.getElementById(id);
+      el.value = "";
+      el.classList.remove("invalid");
+    });
+    document.getElementById("date").valueAsDate = new Date();
+    formErrorEl.classList.remove("show");
+    applyDeptChange();
+  });
+
+  // init
+  (function initLogos(){
+    const logoSrc = document.getElementById("logoTemplate").src;
+    ["certLogo1","certLogo2","certWatermark1","certWatermark2","successModalLogo"].forEach(id => {
+      document.getElementById(id).src = logoSrc;
+    });
+  })();
+  document.getElementById("date").valueAsDate = new Date();
+  applyDeptChange();
+  updateAdminUI();
+
+  // Start listening to the cloud copies of class strength & department info. The first snapshot
+  // (from cache or server) refreshes the form automatically once it arrives — see onCloudDataChanged().
+  listenToCloudDoc(CLOUD_STRENGTH_DOC, STRENGTH_KEY);
+  listenToCloudDoc(CLOUD_DEPTINFO_DOC, DEPT_INFO_KEY);
+
+  // Auto-clear submissions once they pass the 9:00 AM cutoff, even if this tab is left open overnight.
+  purgeExpiredSubmissions();
+  setInterval(() => {
+    if(purgeExpiredSubmissions() && isAdmin) renderSubmissionsPanel();
+  }, 60000);
+</script>
+</body>
+</html>
