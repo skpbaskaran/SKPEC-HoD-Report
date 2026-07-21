@@ -1269,7 +1269,7 @@
               <div class="section-label">Talk on a Topic</div>
               <table class="report-table">
                 <thead>
-                  <tr><th>Year</th><th>Topic Explored</th><th>Status</th></tr>
+                  <tr><th>Year</th><th>Section</th><th>Topic Explored</th><th>Status</th></tr>
                 </thead>
                 <tbody id="talkTbody"></tbody>
               </table>
@@ -1301,7 +1301,7 @@
               <div class="section-label apex-label">⭐ Apex Training</div>
               <table class="report-table apex-table">
                 <thead>
-                  <tr><th>Year</th><th>Trainer Name</th><th>Class Hours</th></tr>
+                  <tr><th>Year</th><th>Section</th><th>Trainer Name</th><th>Class Hours</th></tr>
                 </thead>
                 <tbody id="apexTbody"></tbody>
               </table>
@@ -1448,8 +1448,8 @@
   }
   function strengthIdsFor(years){ return years.flatMap(n => [`y${n}atotal`, `y${n}btotal`]); }
   function presentIdsFor(years){ return years.flatMap(n => [`y${n}apresent`, `y${n}bpresent`, `y${n}aabsent`, `y${n}babsent`]); }
-  function talkIdsFor(years){ return years.flatMap(n => [`t${n}topic`, `t${n}status`]); }
-  function apexIdsFor(years){ return years.flatMap(n => [`ap${n}trainer`, `ap${n}hours`]); }
+  function talkIdsFor(years){ return years.flatMap(n => [`t${n}atopic`, `t${n}astatus`, `t${n}btopic`, `t${n}bstatus`]); }
+  function apexIdsFor(years){ return years.flatMap(n => [`ap${n}atrainer`, `ap${n}ahours`, `ap${n}btrainer`, `ap${n}bhours`]); }
 
   const requiredIds = ["dept","head","date"];
   const staticTextIds = ["dept","head","date","totalstaff","staffpresent","totalstudents","remarks"];
@@ -1466,7 +1466,7 @@
       <div class="row2" data-year="${n}">
         <div class="field-pair" data-year="${n}" data-section="A">
           <div class="field"><label data-field-type="present">${YEAR_LABEL[n]} – A Class — Present</label><input id="y${n}apresent" type="number" min="0" placeholder="0" /></div>
-          <div class="field"><label data-field-type="absent">${YEAR_LABEL[n]} – A Class — Absent</label><input id="y${n}aabsent" type="number" min="0" placeholder="0" /></div>
+          <div class="field"><label data-field-type="absent">${YEAR_LABEL[n]} – A Class — Absent</label><input id="y${n}aabsent" type="number" min="0" placeholder="Auto-filled" readonly /></div>
           <div class="field absentees-field">
             <label data-field-type="absentees" for="y${n}aabsentees">${YEAR_LABEL[n]} – A Class — Absentees Tracker</label>
             <select id="y${n}aabsentees">
@@ -1477,7 +1477,7 @@
         </div>
         <div class="field-pair" data-year="${n}" data-section="B">
           <div class="field"><label data-field-type="present">${YEAR_LABEL[n]} – B Class — Present</label><input id="y${n}bpresent" type="number" min="0" placeholder="0" /></div>
-          <div class="field"><label data-field-type="absent">${YEAR_LABEL[n]} – B Class — Absent</label><input id="y${n}babsent" type="number" min="0" placeholder="0" /></div>
+          <div class="field"><label data-field-type="absent">${YEAR_LABEL[n]} – B Class — Absent</label><input id="y${n}babsent" type="number" min="0" placeholder="Auto-filled" readonly /></div>
           <div class="field absentees-field">
             <label data-field-type="absentees" for="y${n}babsentees">${YEAR_LABEL[n]} – B Class — Absentees Tracker</label>
             <select id="y${n}babsentees">
@@ -1490,21 +1490,40 @@
 
     talkEl.innerHTML = years.map(n => `
       <div class="row2" data-year="${n}">
-        <div class="field"><label>${YEAR_LABEL[n]} — Topic Explored</label><input id="t${n}topic" type="text" placeholder="e.g., Topic Name" /></div>
-        <div class="field">
-          <label for="t${n}status">${YEAR_LABEL[n]} — Status</label>
-          <select id="t${n}status">
-            <option value="">—</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
+        <div class="field-pair" data-year="${n}" data-section="A">
+          <div class="field"><label data-field-type="topic">${YEAR_LABEL[n]} – A Class — Topic Explored</label><input id="t${n}atopic" type="text" placeholder="e.g., Topic Name" /></div>
+          <div class="field">
+            <label data-field-type="status" for="t${n}astatus">${YEAR_LABEL[n]} – A Class — Status</label>
+            <select id="t${n}astatus">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-pair" data-year="${n}" data-section="B">
+          <div class="field"><label data-field-type="topic">${YEAR_LABEL[n]} – B Class — Topic Explored</label><input id="t${n}btopic" type="text" placeholder="e.g., Topic Name" /></div>
+          <div class="field">
+            <label data-field-type="status" for="t${n}bstatus">${YEAR_LABEL[n]} – B Class — Status</label>
+            <select id="t${n}bstatus">
+              <option value="">—</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
         </div>
       </div>`).join("");
 
     apexEl.innerHTML = years.map(n => `
       <div class="row2" data-year="${n}">
-        <div class="field"><label>${YEAR_LABEL[n]} — Trainer Name</label><input id="ap${n}trainer" type="text" placeholder="e.g., Trainer Name" /></div>
-        <div class="field"><label>${YEAR_LABEL[n]} — Class Hours</label><input id="ap${n}hours" type="text" placeholder="e.g., 1&2" /></div>
+        <div class="field-pair" data-year="${n}" data-section="A">
+          <div class="field"><label data-field-type="trainer">${YEAR_LABEL[n]} – A Class — Trainer Name</label><input id="ap${n}atrainer" type="text" placeholder="e.g., Trainer Name" /></div>
+          <div class="field"><label data-field-type="hours">${YEAR_LABEL[n]} – A Class — Class Hours</label><input id="ap${n}ahours" type="text" placeholder="e.g., 1&2" /></div>
+        </div>
+        <div class="field-pair" data-year="${n}" data-section="B">
+          <div class="field"><label data-field-type="trainer">${YEAR_LABEL[n]} – B Class — Trainer Name</label><input id="ap${n}btrainer" type="text" placeholder="e.g., Trainer Name" /></div>
+          <div class="field"><label data-field-type="hours">${YEAR_LABEL[n]} – B Class — Class Hours</label><input id="ap${n}bhours" type="text" placeholder="e.g., 1&2" /></div>
+        </div>
       </div>`).join("");
 
     bindDynamicFieldEvents();
@@ -1538,13 +1557,13 @@
       });
     });
 
-    document.getElementById("talkTbody").innerHTML = years.map(n =>
-      `<tr data-year="${n}"><td>${YEAR_SHORT[n]}</td><td id="outT${n}Topic">—</td><td id="outT${n}Status">—</td></tr>`
-    ).join("");
+    document.getElementById("talkTbody").innerHTML = years.flatMap(n => ["A","B"].map(sec =>
+      `<tr data-year="${n}" data-section="${sec}"><td>${YEAR_SHORT[n]}</td><td>${sec}</td><td id="outT${n}${sec}Topic">—</td><td id="outT${n}${sec}Status">—</td></tr>`
+    )).join("");
 
-    document.getElementById("apexTbody").innerHTML = years.map(n =>
-      `<tr data-year="${n}"><td>${YEAR_SHORT[n]}</td><td id="outAp${n}Trainer">—</td><td id="outAp${n}Hours">—</td></tr>`
-    ).join("");
+    document.getElementById("apexTbody").innerHTML = years.flatMap(n => ["A","B"].map(sec =>
+      `<tr data-year="${n}" data-section="${sec}"><td>${YEAR_SHORT[n]}</td><td>${sec}</td><td id="outAp${n}${sec}Trainer">—</td><td id="outAp${n}${sec}Hours">—</td></tr>`
+    )).join("");
   }
 
   /* ---------------- CLASS STRENGTH (ADMIN-ONLY, PER-YEAR DEFAULT/A/B) ---------------- */
@@ -1781,6 +1800,52 @@
         if(sectionCell) sectionCell.textContent = (hasDefault && !hasA) ? "—" : "A";
       }
       if(attRowB) attRowB.style.display = showB ? "" : "none";
+
+      // Talk on a Topic — mirror the same A/B show/hide as the Present fields above.
+      const talkAWrap = document.querySelector(`#talkFieldsContainer .field-pair[data-year="${n}"][data-section="A"]`);
+      const talkBWrap = document.querySelector(`#talkFieldsContainer .field-pair[data-year="${n}"][data-section="B"]`);
+      if(talkAWrap){
+        talkAWrap.style.display = showA ? "" : "none";
+        const classLabel = (hasDefault && !hasA) ? `${YEAR_LABEL[n]} – Class` : `${YEAR_LABEL[n]} – A Class`;
+        talkAWrap.querySelectorAll("label").forEach(l => {
+          const type = l.dataset.fieldType;
+          if(type === "topic") l.textContent = `${classLabel} — Topic Explored`;
+          else if(type === "status") l.textContent = `${classLabel} — Status`;
+        });
+      }
+      if(talkBWrap) talkBWrap.style.display = showB ? "" : "none";
+
+      const talkRowA = document.querySelector(`#talkTbody tr[data-year="${n}"][data-section="A"]`);
+      const talkRowB = document.querySelector(`#talkTbody tr[data-year="${n}"][data-section="B"]`);
+      if(talkRowA){
+        talkRowA.style.display = showA ? "" : "none";
+        const sectionCell = talkRowA.children[1];
+        if(sectionCell) sectionCell.textContent = (hasDefault && !hasA) ? "—" : "A";
+      }
+      if(talkRowB) talkRowB.style.display = showB ? "" : "none";
+
+      // Apex Training — mirror the same A/B show/hide as the Present fields above.
+      const apexAWrap = document.querySelector(`#apexFieldsContainer .field-pair[data-year="${n}"][data-section="A"]`);
+      const apexBWrap = document.querySelector(`#apexFieldsContainer .field-pair[data-year="${n}"][data-section="B"]`);
+      if(apexAWrap){
+        apexAWrap.style.display = showA ? "" : "none";
+        const classLabel = (hasDefault && !hasA) ? `${YEAR_LABEL[n]} – Class` : `${YEAR_LABEL[n]} – A Class`;
+        apexAWrap.querySelectorAll("label").forEach(l => {
+          const type = l.dataset.fieldType;
+          if(type === "trainer") l.textContent = `${classLabel} — Trainer Name`;
+          else if(type === "hours") l.textContent = `${classLabel} — Class Hours`;
+        });
+      }
+      if(apexBWrap) apexBWrap.style.display = showB ? "" : "none";
+
+      const apexRowA = document.querySelector(`#apexTbody tr[data-year="${n}"][data-section="A"]`);
+      const apexRowB = document.querySelector(`#apexTbody tr[data-year="${n}"][data-section="B"]`);
+      if(apexRowA){
+        apexRowA.style.display = showA ? "" : "none";
+        const sectionCell = apexRowA.children[1];
+        if(sectionCell) sectionCell.textContent = (hasDefault && !hasA) ? "—" : "A";
+      }
+      if(apexRowB) apexRowB.style.display = showB ? "" : "none";
     });
   }
 
@@ -2178,9 +2243,8 @@
         const visible = !wrapper || wrapper.style.display !== "none";
         const total = getSavedTotal(deptVal, n, sec);
         const present = num(`y${n}${secLower}present`);
-        const absentEl = document.getElementById(`y${n}${secLower}absent`);
-        const absentRaw = absentEl ? absentEl.value : "";
-        const absent = absentRaw !== "" ? Number(absentRaw) : Math.max(total - present, 0);
+        // Absent is always Total - Present — the HOD only ever enters Present.
+        const absent = Math.max(total - present, 0);
         return {
           year: YEAR_LABEL[n],
           section: sec,
@@ -2335,18 +2399,18 @@
         const aEl = document.getElementById(aId);
         if(!pEl) return;
         const t = getSavedTotal(mainDeptVal, n, sec), p = num(pId);
-        const aRaw = aEl ? aEl.value : "";
-        const enteredAbsent = aRaw !== "" ? Number(aRaw) : null;
-        const a = enteredAbsent !== null ? enteredAbsent : (t ? Math.max(t - p, 0) : 0);
+        // Absent is always derived — Total - Present — never typed in by the HOD.
+        const a = t ? Math.max(t - p, 0) : 0;
+        if(aEl) aEl.value = t ? a : "";
         sumTotal += t;
         sumPresent += p;
         sumAbsent += a;
-        if(enteredAbsent !== null) haveAnyAbsent = true;
+        if(t) haveAnyAbsent = true;
         const outTEl = document.getElementById(`outY${n}${sec}Total`);
         if(outTEl){
           outTEl.textContent = t || "—";
           document.getElementById(`outY${n}${sec}Present`).textContent = pEl.value || "—";
-          document.getElementById(`outY${n}${sec}Absent`).textContent = (enteredAbsent !== null) ? aRaw : (t ? a : "—");
+          document.getElementById(`outY${n}${sec}Absent`).textContent = t ? a : "—";
           const absListEl = document.getElementById(`outY${n}${sec}AbsList`);
           if(absListEl) absListEl.textContent = getAbsenteesTracker(n, sec) ? "Yes" : "No";
         }
@@ -2362,16 +2426,19 @@
     document.getElementById("outSumAbsent").textContent = (haveAnyAbsent || sumTotal) ? sumAbsent : "—";
 
     currentYears.forEach(n => {
-      const topicOutEl = document.getElementById(`outT${n}Topic`);
-      if(topicOutEl){
-        topicOutEl.textContent = textOrDash(`t${n}topic`, "—");
-        document.getElementById(`outT${n}Status`).textContent = textOrDash(`t${n}status`, "—");
-      }
-      const trainerOutEl = document.getElementById(`outAp${n}Trainer`);
-      if(trainerOutEl){
-        trainerOutEl.textContent = textOrDash(`ap${n}trainer`, "—");
-        document.getElementById(`outAp${n}Hours`).textContent = (document.getElementById(`ap${n}hours`) || {}).value || "—";
-      }
+      ["A","B"].forEach(sec => {
+        const secLower = sec.toLowerCase();
+        const topicOutEl = document.getElementById(`outT${n}${sec}Topic`);
+        if(topicOutEl){
+          topicOutEl.textContent = textOrDash(`t${n}${secLower}topic`, "—");
+          document.getElementById(`outT${n}${sec}Status`).textContent = textOrDash(`t${n}${secLower}status`, "—");
+        }
+        const trainerOutEl = document.getElementById(`outAp${n}${sec}Trainer`);
+        if(trainerOutEl){
+          trainerOutEl.textContent = textOrDash(`ap${n}${secLower}trainer`, "—");
+          document.getElementById(`outAp${n}${sec}Hours`).textContent = (document.getElementById(`ap${n}${secLower}hours`) || {}).value || "—";
+        }
+      });
     });
 
     document.getElementById("outRemarks").textContent = textOrDash("remarks", "—");
@@ -2401,11 +2468,15 @@
         const visible = wrapper && wrapper.style.display !== "none";
         if(visible){
           ids.push(`y${n}${secLower}present`);
-          ids.push(`y${n}${secLower}absent`);
+        }
+
+        const talkWrapper = document.querySelector(`#talkFieldsContainer .field-pair[data-year="${n}"][data-section="${sec}"]`);
+        const talkVisible = talkWrapper && talkWrapper.style.display !== "none";
+        if(talkVisible){
+          ids.push(`t${n}${secLower}topic`);
+          ids.push(`t${n}${secLower}status`);
         }
       });
-      ids.push(`t${n}topic`);
-      ids.push(`t${n}status`);
     });
 
     return ids;
@@ -2427,8 +2498,8 @@
       }
     });
 
-    // Present + Absent must never exceed the saved Total strength for that
-    // year/section — otherwise the numbers don't make sense. Block submit if so.
+    // Present must never exceed the saved Total strength for that year/section
+    // — Absent is auto-derived (Total - Present), so this just guards Present itself.
     let countMismatch = false;
     const mainDeptVal = document.getElementById("dept").value;
     currentYears.forEach(n => {
@@ -2460,7 +2531,7 @@
       formErrorEl.classList.remove("show");
     } else {
       formErrorEl.textContent = countMismatch
-        ? "⚠️ Present + Absent cannot be more than the Total strength for a class. Please check the highlighted fields."
+        ? "⚠️ Present cannot be more than the Total strength for a class. Please check the highlighted fields."
         : "⚠️ Please fill in all fields (Apex Training and Remarks are optional) before submitting.";
       formErrorEl.classList.add("show");
       if(firstInvalid){
