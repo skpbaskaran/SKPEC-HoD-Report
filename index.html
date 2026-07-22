@@ -1374,6 +1374,7 @@
       </div>
       <div class="success-modal-body">
         <p>The Admin will review it in today&rsquo;s submissions.</p>
+        <p id="successModalEmailNote" style="font-size:12.5px;color:var(--grey);margin-top:-4px;"></p>
         <button type="button" class="btn btn-primary" id="successModalOkBtn">OK</button>
       </div>
     </div>
@@ -2013,6 +2014,8 @@
   /* ---------------- ADMIN LOGIN ---------------- */
   const ADMIN_USERNAME = "principal@skpec.in"; // change this to whatever you like
   const ADMIN_PASSWORD = "Skpec*1234";         // change this to whatever you like
+  const REPORT_EMAIL_TO   = "skpbaskaran82@gmail.com";
+  const APPS_SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbzfxEkFkNGSjuRKyJhyNswxVSTsecpJXdr5M0oVi9GOxqNDPg89MjaY_X2n3-A7hM1J/exec";
   const ADMIN_SESSION_KEY = "hodReport_adminSession_v1";
   let isAdmin = sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
 
@@ -2104,7 +2107,71 @@
   function escapeHtml(str){
     return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
+function buildSubmissionExcelBase64(s){
+    const rows = [];
+    const att = s.attendance || [];
+    if(att.length === 0){
+      rows.push({
+        "Dept Name": s.dept, "Head Name": s.head,
+        "Total Staff": s.totalStaff, "Total Students": s.totalStudents,
+        "Year": "—", "Section": "—", "Total Strength": "—", "Present": "—",
+        "Absent": "—", "Attendance %": "—", "Absentees Tracker": "—",
+        "Report Date": s.date, "Submitted On": s.submittedOn
+      });
+    } else {
+      att.forEach(r => {
+        const absentVal = (r.absent !== undefined && r.absent !== null) ? r.absent : Math.max((r.total||0) - (r.present||0), 0);
+        const pct = r.total ? ((r.present / r.total) * 100).toFixed(1) + "%" : "—";
+        rows.push({
+          "Dept Name": s.dept, "Head Name": s.head,
+          "Total Staff": s.totalStaff, "Total Students": s.totalStudents,
+          "Year": r.year, "Section": r.section, "Total Strength": r.total,
+          "Present": r.present, "Absent": absentVal, "Attendance %": pct,
+          "Absentees Tracker": r.absenteesTracker ? "Yes" : "No",
+          "Report Date": s.date, "Submitted On": s.submittedOn
+        });
+      });
+    }
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [
+      { wch: 22 }, { wch: 20 }, { wch: 11 }, { wch: 13 }, { wch: 8 },
+      { wch: 9 }, { wch: 14 }, { wch: 9 }, { wch: 9 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    return XLSX.write(wb, { type: "base64", bookType: "xlsx" });
+  }
 
+  async function emailSubmissionReport(s, pdfBase64){
+    if(!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf("PASTE_YOUR") === 0){
+      console.warn("Email-on-submit skipped: APPS_SCRIPT_URL is not configured yet.");
+      return { ok:false, reason:"not-configured" };
+    }
+    try{
+      const excelBase64 = buildSubmissionExcelBase64(s);
+      const resp = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          to: REPORT_EMAIL_TO,
+          dept: s.dept,
+          head: s.head,
+          date: s.date,
+          pdfBase64,
+          excelBase64,
+          pdfFileName: `HOD_Report_${s.dept}_${s.date.replace(/\//g,"-")}.pdf`,
+          excelFileName: `HOD_Report_${s.dept}_${s.date.replace(/\//g,"-")}.xlsx`
+        })
+      });
+      const data = await resp.json().catch(() => ({}));
+      if(data && data.status === "success") return { ok:true };
+      console.error("Email-on-submit: relay responded with an error", data);
+      return { ok:false, reason:"relay-error" };
+    } catch(err){
+      console.error("Email-on-submit failed:", err);
+      return { ok:false, reason:"network-error" };
+    }
+  }
   async function buildReportPdf(){
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -2237,6 +2304,7 @@
     try {
       const pdf = await buildReportPdf();
       const pdfDataUrl = pdf.output("datauristring");
+      const pdfBase64  = pdf.output("base64");
       const attendance = currentYears.flatMap(n => ["A","B"].map(sec => {
         const secLower = sec.toLowerCase();
         const wrapper = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="${sec}"]`);
@@ -2255,7 +2323,7 @@
           visible
         };
       })).filter(r => r.visible);
-      submissions.push({
+      const record = {
         id: Date.now() + "_" + Math.random().toString(36).slice(2, 8),
         dept: deptVal,
         head: document.getElementById("head").value.trim(),
@@ -2265,11 +2333,16 @@
         submittedOn: new Date().toLocaleString("en-GB"),
         attendance,
         pdfDataUrl
-      });
+      };
+      submissions.push(record);
       setSubmissions(submissions);
       btn.textContent = "✅ Submitted!";
-      openSuccessModal(deptVal);
       renderSubmissionsPanel();
+
+      btn.textContent = "📧 Emailing…";
+      const emailResult = await emailSubmissionReport(record, pdfBase64);
+      btn.textContent = "✅ Submitted!";
+      openSuccessModal(deptVal, emailResult);
       setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 2000);
     } catch(err){
       alert("Could not submit the application. Please try again.");
@@ -2279,15 +2352,26 @@
     }
   });
 
-  const successOverlay  = document.getElementById("successModalOverlay");
-  const successDeptEl   = document.getElementById("successModalDept");
-  const successOkBtn    = document.getElementById("successModalOkBtn");
+  const successOverlay   = document.getElementById("successModalOverlay");
+  const successDeptEl    = document.getElementById("successModalDept");
+  const successOkBtn     = document.getElementById("successModalOkBtn");
+  const successEmailNote = document.getElementById("successModalEmailNote");
 
-  function openSuccessModal(deptVal){
+  function openSuccessModal(deptVal, emailResult){
     successDeptEl.textContent = deptVal;
+    if(emailResult && emailResult.ok){
+      successEmailNote.textContent = `📧 PDF & Excel emailed to ${REPORT_EMAIL_TO}`;
+    } else if(emailResult && emailResult.reason === "not-configured"){
+      successEmailNote.textContent = "";
+    } else if(emailResult){
+      successEmailNote.textContent = "⚠️ Could not email the report automatically — saved locally for the Admin.";
+    } else {
+      successEmailNote.textContent = "";
+    }
     successOverlay.classList.add("open");
     setTimeout(() => successOkBtn.focus(), 50);
   }
+  
   function closeSuccessModal(){
     successOverlay.classList.remove("open");
   }
