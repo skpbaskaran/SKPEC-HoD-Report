@@ -2233,7 +2233,7 @@ function buildSubmissionExcelBase64(s){
       pageEls.map(el => html2canvas(el, { scale: 2.2, backgroundColor: "#FFFFFF" }))
     );
     canvases.forEach((canvas, i) => {
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const imgData = canvas.toDataURL("image/jpeg", 0.88);
       const imgH = (canvas.height * pageW) / canvas.width;
       if (i > 0) pdf.addPage();
       pdf.addImage(imgData, "JPEG", 0, 0, pageW, Math.min(imgH, pageH));
@@ -2410,7 +2410,7 @@ function buildSubmissionExcelBase64(s){
       // no paid Storage plan needed. Firestore caps a document at ~1MiB, so this only embeds
       // the PDF if it comfortably fits; if a report ever renders unusually large, the PDF is
       // simply left out of the cloud copy (the emailed PDF is always sent either way).
-      const PDF_CLOUD_SIZE_LIMIT = 700000; // characters, leaves headroom under Firestore's 1MiB doc cap
+      const PDF_CLOUD_SIZE_LIMIT = 950000; // characters, leaves a small safety margin under Firestore's 1MiB doc cap
       if(pdfDataUrl.length <= PDF_CLOUD_SIZE_LIMIT){
         record.pdfDataUrl = pdfDataUrl;
       } else {
