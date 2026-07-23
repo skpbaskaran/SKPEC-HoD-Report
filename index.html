@@ -12,7 +12,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <style>
   :root{
     --navy:#13294B;
@@ -355,7 +354,7 @@
   }
   .sub-row .sub-dept{ font-weight:700; color:var(--navy); }
   .sub-row .sub-meta{ color:var(--grey); font-size:11px; margin-top:2px; }
-  .sub-row .viewSubBtn{
+  .sub-row .viewSubBtn, .sub-row .downloadExcelBtn{
     font-size:11px;
     padding:6px 12px;
     border-radius:6px;
@@ -366,7 +365,8 @@
     font-weight:600;
     white-space:nowrap;
   }
-  .sub-row .viewSubBtn:hover{ background:var(--navy-soft); }
+  .sub-row .viewSubBtn:hover, .sub-row .downloadExcelBtn:hover{ background:var(--navy-soft); }
+  .sub-row-actions{ display:flex; gap:8px; flex-shrink:0; }
   .sub-row{ flex-direction:column; align-items:stretch; }
   .sub-row-head{
     display:flex;
@@ -1395,12 +1395,10 @@
   };
   firebase.initializeApp(firebaseConfig);
   const cloudDb = firebase.firestore();
-  const cloudStorage = firebase.storage();
   const CLOUD_COLLECTION = "hodReportData";
   const CLOUD_STRENGTH_DOC = "classStrength";
   const CLOUD_DEPTINFO_DOC = "deptInfo";
   const CLOUD_SUBMISSIONS_COLLECTION = "hodReportSubmissions"; // one document per submission, keyed by its id
-  const SUBMISSION_PDF_FOLDER = "submissionPdfs"; // Firebase Storage folder for hosted PDF copies
   let cloudReady = false; // becomes true once the first cloud read completes
 
   // Pushes a full local object (class strength or department info) up to Firestore so every
@@ -2111,14 +2109,12 @@
     if(!expiry) return true; // malformed date — don't accidentally wipe it
     return new Date() < expiry;
   }
-  // Removes a submission's Firestore doc + hosted PDF once it's past its 9:00 AM cutoff.
-  // Any connected device (HOD or Admin) can trigger this — it's harmless if two devices race,
-  // since deleting an already-deleted doc/file just resolves as a no-op.
+  // Removes a submission's Firestore doc once it's past its 9:00 AM cutoff. Any connected
+  // device (HOD or Admin) can trigger this — it's harmless if two devices race, since deleting
+  // an already-deleted doc just resolves as a no-op.
   function deleteSubmissionFromCloud(id){
     cloudDb.collection(CLOUD_SUBMISSIONS_COLLECTION).doc(id).delete()
       .catch(err => console.error("Could not delete expired submission from the cloud:", err));
-    cloudStorage.ref(`${SUBMISSION_PDF_FOLDER}/${id}.pdf`).delete()
-      .catch(() => {}); // ignore "file not found" — it may never have finished uploading
   }
   // Purges expired submissions from the cloud (source of truth) and, as a fallback, from the
   // local offline cache so a stale badge doesn't linger if this device is offline.
@@ -2150,6 +2146,16 @@
   function escapeHtml(str){
     return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
+// Triggers a browser download for a base64-encoded file (used for per-submission Excel downloads).
+function downloadBase64File(base64, filename, mime){
+  const link = document.createElement("a");
+  link.href = `data:${mime};base64,${base64}`;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function buildSubmissionExcelBase64(s){
     const rows = [];
     const att = s.attendance || [];
@@ -2256,7 +2262,10 @@ function buildSubmissionExcelBase64(s){
       <div class="sub-row">
         <div class="sub-row-head">
           <div class="sub-dept">${escapeHtml(s.dept)}</div>
-          <button type="button" class="viewSubBtn" data-id="${escapeHtml(s.id)}">👁 View PDF</button>
+          <div class="sub-row-actions">
+            <button type="button" class="viewSubBtn" data-id="${escapeHtml(s.id)}">👁 View PDF</button>
+            <button type="button" class="downloadExcelBtn" data-id="${escapeHtml(s.id)}">⬇ Excel</button>
+          </div>
         </div>
         <table class="sub-attendance-table">
           <thead><tr><th>Year</th><th>Section</th><th>Total Strength</th><th>Present</th><th>Absent</th><th>Absentees Tracker</th></tr></thead>
@@ -2268,17 +2277,26 @@ function buildSubmissionExcelBase64(s){
     listEl.querySelectorAll(".viewSubBtn").forEach(btn => {
       btn.addEventListener("click", () => {
         const rec = getSubmissions().find(x => x.id === btn.dataset.id);
-        if(rec && rec.pdfUrl){
-          // Hosted in Firebase Storage — opens fine from any device, not just the one that submitted.
-          window.open(rec.pdfUrl, "_blank");
-        } else if(rec && rec.pdfDataUrl){
-          // Fallback: only present if this is the same device/browser that submitted it
-          // (e.g. the cloud upload hadn't finished before this record was cached locally).
+        if(rec && rec.pdfDataUrl){
+          // Embedded directly in the Firestore doc — this now opens fine from any device,
+          // not just the one that submitted it, with no separate hosting/Storage needed.
           const w = window.open();
           if(w) w.document.write(`<iframe src="${rec.pdfDataUrl}" style="border:0;width:100%;height:100vh;"></iframe>`);
         } else {
-          alert("This report's PDF isn't hosted for cross-device viewing (Storage needs the Blaze plan). Please check the emailed copy in the inbox instead — it was sent automatically on submission.");
+          alert("This report's PDF was too large to store alongside the submission. Please check the emailed copy in the inbox instead — it was sent automatically on submission.");
         }
+      });
+    });
+    listEl.querySelectorAll(".downloadExcelBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const rec = getSubmissions().find(x => x.id === btn.dataset.id);
+        if(!rec) return;
+        const base64 = buildSubmissionExcelBase64(rec);
+        downloadBase64File(
+          base64,
+          `HOD_Report_${rec.dept}_${rec.date.replace(/\//g,"-")}.xlsx`,
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        );
       });
     });
   }
@@ -2388,10 +2406,20 @@ function buildSubmissionExcelBase64(s){
         attendance
       };
 
-      // Write the submission itself to Firestore — this is what makes it show up on the
-      // Admin panel on ANY device, not just the one that submitted it. (PDF hosting via Storage
-      // was removed here since it needs a paid Blaze plan we're not using — it was also the
-      // main thing slowing down every submit, since it always ran and timed out before failing.)
+      // Embed the PDF directly in the Firestore doc so "View PDF" works from ANY device —
+      // no paid Storage plan needed. Firestore caps a document at ~1MiB, so this only embeds
+      // the PDF if it comfortably fits; if a report ever renders unusually large, the PDF is
+      // simply left out of the cloud copy (the emailed PDF is always sent either way).
+      const PDF_CLOUD_SIZE_LIMIT = 700000; // characters, leaves headroom under Firestore's 1MiB doc cap
+      if(pdfDataUrl.length <= PDF_CLOUD_SIZE_LIMIT){
+        record.pdfDataUrl = pdfDataUrl;
+      } else {
+        record.pdfTooLargeForCloud = true;
+        console.warn("PDF too large to embed in Firestore (" + pdfDataUrl.length + " chars) — only the emailed copy will be available.");
+      }
+
+      // Write the submission itself to Firestore — this is what makes it show up (and its PDF
+      // be viewable) on the Admin panel on ANY device, not just the one that submitted it.
       try {
         await cloudDb.collection(CLOUD_SUBMISSIONS_COLLECTION).doc(record.id).set(record);
       } catch(cloudErr){
