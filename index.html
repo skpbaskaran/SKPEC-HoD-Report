@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <style>
   :root{
     --navy:#13294B;
@@ -1395,6 +1396,7 @@
   };
   firebase.initializeApp(firebaseConfig);
   const cloudDb = firebase.firestore();
+  const cloudStorage = firebase.storage(); // used as a fallback home for PDFs too large to embed in Firestore
   const CLOUD_COLLECTION = "hodReportData";
   const CLOUD_STRENGTH_DOC = "classStrength";
   const CLOUD_DEPTINFO_DOC = "deptInfo";
@@ -2146,6 +2148,14 @@
   function escapeHtml(str){
     return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   }
+// Converts a base64 string into a Blob (used to upload large PDFs to Firebase Storage).
+function base64ToBlob(base64, mime){
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for(let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+  return new Blob([new Uint8Array(byteNumbers)], { type: mime });
+}
+
 // Triggers a browser download for a base64-encoded file (used for per-submission Excel downloads).
 function downloadBase64File(base64, filename, mime){
   const link = document.createElement("a");
@@ -2212,12 +2222,33 @@ function buildSubmissionExcelBase64(s){
           excelFileName: `HOD_Report_${s.dept}_${s.date.replace(/\//g,"-")}.xlsx`
         })
       });
-      const data = await resp.json().catch(() => ({}));
+      // Read the raw text FIRST (a body can only be read once) so that if the Apps Script
+      // returns something that isn't valid JSON — an HTML login/permission page, a Google
+      // error page, etc. — we can still see exactly what came back instead of a blank {}.
+      const rawText = await resp.text();
+      let data = {};
+      try { data = JSON.parse(rawText); }
+      catch(parseErr){
+        console.error(
+          "Email-on-submit: relay did not return JSON (HTTP " + resp.status + "). " +
+          "This usually means the Apps Script deployment needs 'Anyone' access, or a new " +
+          "deployment was never made after the script was last edited. Raw response below:",
+          rawText.slice(0, 1000)
+        );
+        return { ok:false, reason:"bad-response", httpStatus: resp.status };
+      }
+      if(!resp.ok){
+        console.error("Email-on-submit: HTTP error " + resp.status, data);
+        return { ok:false, reason:"http-error", httpStatus: resp.status, data };
+      }
       if(data && data.status === "success") return { ok:true };
       console.error("Email-on-submit: relay responded with an error", data);
-      return { ok:false, reason:"relay-error" };
+      return { ok:false, reason:"relay-error", data };
     } catch(err){
-      console.error("Email-on-submit failed:", err);
+      // A fetch() throwing almost always means the request never reached Google at all —
+      // most commonly a CORS rejection because the deployed Web App's access isn't set to
+      // "Anyone", or the APPS_SCRIPT_URL is wrong/old (redeployed with a new URL since).
+      console.error("Email-on-submit failed (request never completed):", err);
       return { ok:false, reason:"network-error" };
     }
   }
@@ -2282,8 +2313,12 @@ function buildSubmissionExcelBase64(s){
           // not just the one that submitted it, with no separate hosting/Storage needed.
           const w = window.open();
           if(w) w.document.write(`<iframe src="${rec.pdfDataUrl}" style="border:0;width:100%;height:100vh;"></iframe>`);
+        } else if(rec && rec.pdfStorageUrl){
+          // PDF was too large for Firestore, so it lives in Firebase Storage instead —
+          // opening it directly still works from any device.
+          window.open(rec.pdfStorageUrl, "_blank");
         } else {
-          alert("This report's PDF was too large to store alongside the submission. Please check the emailed copy in the inbox instead — it was sent automatically on submission.");
+          alert("This report's PDF isn't available to view (it may still be uploading, or the upload failed). Please check the emailed copy in the inbox instead.");
         }
       });
     });
@@ -2414,8 +2449,17 @@ function buildSubmissionExcelBase64(s){
       if(pdfDataUrl.length <= PDF_CLOUD_SIZE_LIMIT){
         record.pdfDataUrl = pdfDataUrl;
       } else {
-        record.pdfTooLargeForCloud = true;
-        console.warn("PDF too large to embed in Firestore (" + pdfDataUrl.length + " chars) — only the emailed copy will be available.");
+        // Too big for a Firestore field — upload it to Firebase Storage instead so "View PDF"
+        // in the Admin panel still works from any device, not just the emailed copy.
+        try{
+          const pdfBlob = base64ToBlob(pdfBase64, "application/pdf");
+          const storagePath = `submissionPdfs/${record.id}.pdf`;
+          const uploadTask = await cloudStorage.ref(storagePath).put(pdfBlob, { contentType: "application/pdf" });
+          record.pdfStorageUrl = await uploadTask.ref.getDownloadURL();
+        } catch(storageErr){
+          console.error("PDF too large for Firestore AND Storage upload failed — only the emailed copy will be available:", storageErr);
+          record.pdfTooLargeForCloud = true;
+        }
       }
 
       // Write the submission itself to Firestore — this is what makes it show up (and its PDF
@@ -2458,7 +2502,8 @@ function buildSubmissionExcelBase64(s){
     } else if(emailResult && emailResult.reason === "not-configured"){
       successEmailNote.textContent = "";
     } else if(emailResult){
-      successEmailNote.textContent = "⚠️ Could not email the report automatically — saved locally for the Admin.";
+      // Still saved to the Admin panel either way — this note is just about the email copy.
+      successEmailNote.textContent = "⚠️ Could not email the report automatically (check browser console for the exact reason) — saved for the Admin either way.";
     } else {
       successEmailNote.textContent = "";
     }
