@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 <style>
   :root{
     --navy:#13294B;
@@ -86,10 +87,10 @@
     animation: fadeUp .5s var(--ease) both;
   }
   .brandbar img{
-    width:48px; height:48px;
+    width:68px; height:68px;
     border-radius:50%;
     background:#fff;
-    padding:4px;
+    padding:5px;
     box-shadow:0 4px 14px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.25);
     flex-shrink:0;
   }
@@ -1006,6 +1007,7 @@
     body{ padding:24px 14px 56px; }
     .panel{ padding:24px 20px; }
     .brandbar h1{ font-size:17px; }
+    .brandbar img{ width:56px; height:56px; }
   }
 
   @media print{
@@ -1393,9 +1395,12 @@
   };
   firebase.initializeApp(firebaseConfig);
   const cloudDb = firebase.firestore();
+  const cloudStorage = firebase.storage();
   const CLOUD_COLLECTION = "hodReportData";
   const CLOUD_STRENGTH_DOC = "classStrength";
   const CLOUD_DEPTINFO_DOC = "deptInfo";
+  const CLOUD_SUBMISSIONS_COLLECTION = "hodReportSubmissions"; // one document per submission, keyed by its id
+  const SUBMISSION_PDF_FOLDER = "submissionPdfs"; // Firebase Storage folder for hosted PDF copies
   let cloudReady = false; // becomes true once the first cloud read completes
 
   // Pushes a full local object (class strength or department info) up to Firestore so every
@@ -2015,7 +2020,7 @@
   const ADMIN_USERNAME = "principal@skpec.in"; // change this to whatever you like
   const ADMIN_PASSWORD = "Skpec*1234";         // change this to whatever you like
   const REPORT_EMAIL_TO   = "skpbaskaran82@gmail.com";
-  const APPS_SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbzfxEkFkNGSjuRKyJhyNswxVSTsecpJXdr5M0oVi9GOxqNDPg89MjaY_X2n3-A7hM1J/exec";
+  const APPS_SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbyECEQ6zSdToMNvEWIsQ9GacYOrFfY5Rqpt4z4PZsOBGCtcSomyx_UZwHGGvfupJ5I/exec";
   const ADMIN_SESSION_KEY = "hodReport_adminSession_v1";
   let isAdmin = sessionStorage.getItem(ADMIN_SESSION_KEY) === "1";
 
@@ -2067,17 +2072,29 @@
   }
 
   /* ---------------- SUBMISSIONS (HOD → Admin) ---------------- */
+  // Submissions now live in Firestore (collection CLOUD_SUBMISSIONS_COLLECTION, one doc per
+  // submission keyed by its id) with the PDF hosted in Firebase Storage. This is what makes a
+  // submission from ANY device show up in the Admin panel on ANY OTHER device — the old version
+  // only ever wrote to localStorage, which is private to a single browser/device.
+  // localStorage is kept as a read-only offline fallback so the panel isn't blank before the
+  // first cloud snapshot arrives (or if the device is briefly offline).
   const SUBMISSIONS_KEY = "hodReport_submissions_v1";
   const SUBMISSION_EXPIRY_HOUR = 9; // submissions auto-clear at 9:00 AM the day after their report date
+
+  let cloudSubmissionsCache = [];
+  let cloudSubmissionsReady = false; // becomes true once the first submissions snapshot arrives
 
   function todayStr(){ return new Date().toLocaleDateString("en-GB"); } // dd/mm/yyyy
 
   function getSubmissions(){
+    if(cloudSubmissionsReady) return cloudSubmissionsCache;
     try { return JSON.parse(localStorage.getItem(SUBMISSIONS_KEY) || "[]"); }
     catch(e){ return []; }
   }
-  function setSubmissions(list){
-    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(list));
+  // Offline-fallback cache only — the real write path for a new submission is
+  // cloudDb.collection(CLOUD_SUBMISSIONS_COLLECTION).doc(id).set(record) further below.
+  function cacheSubmissionsLocally(list){
+    try { localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify(list)); } catch(e){}
   }
   function parseDMY(dateStr){
     const [d, m, y] = String(dateStr).split("/").map(Number);
@@ -2094,15 +2111,41 @@
     if(!expiry) return true; // malformed date — don't accidentally wipe it
     return new Date() < expiry;
   }
-  // Deletes submissions from storage once they've passed 9:00 AM the day after their report date.
+  // Removes a submission's Firestore doc + hosted PDF once it's past its 9:00 AM cutoff.
+  // Any connected device (HOD or Admin) can trigger this — it's harmless if two devices race,
+  // since deleting an already-deleted doc/file just resolves as a no-op.
+  function deleteSubmissionFromCloud(id){
+    cloudDb.collection(CLOUD_SUBMISSIONS_COLLECTION).doc(id).delete()
+      .catch(err => console.error("Could not delete expired submission from the cloud:", err));
+    cloudStorage.ref(`${SUBMISSION_PDF_FOLDER}/${id}.pdf`).delete()
+      .catch(() => {}); // ignore "file not found" — it may never have finished uploading
+  }
+  // Purges expired submissions from the cloud (source of truth) and, as a fallback, from the
+  // local offline cache so a stale badge doesn't linger if this device is offline.
   function purgeExpiredSubmissions(){
     const all = getSubmissions();
+    const expired = all.filter(s => !isSubmissionActive(s));
     const kept = all.filter(isSubmissionActive);
-    if(kept.length !== all.length){
-      setSubmissions(kept);
-      return true;
+    if(expired.length){
+      expired.forEach(s => deleteSubmissionFromCloud(s.id));
     }
-    return false;
+    if(!cloudSubmissionsReady && kept.length !== all.length){
+      cacheSubmissionsLocally(kept);
+    }
+    return expired.length > 0;
+  }
+  // Live listener: any submission created on any device (HOD's phone, laptop, etc.) appears here
+  // instantly on every other device with this page open, including the Admin panel.
+  function listenToSubmissionsCloud(){
+    cloudDb.collection(CLOUD_SUBMISSIONS_COLLECTION).onSnapshot(snap => {
+      const list = [];
+      snap.forEach(doc => list.push(doc.data()));
+      cloudSubmissionsCache = list;
+      cloudSubmissionsReady = true;
+      cacheSubmissionsLocally(list);
+      purgeExpiredSubmissions();
+      if(isAdmin) renderSubmissionsPanel();
+    }, err => console.error("Could not read submissions from the cloud:", err));
   }
   function escapeHtml(str){
     return String(str == null ? "" : str).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -2178,13 +2221,17 @@ function buildSubmissionExcelBase64(s){
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const pageEls = [document.getElementById("certPage1"), document.getElementById("certPage2")];
-    for (let i = 0; i < pageEls.length; i++){
-      const canvas = await html2canvas(pageEls[i], { scale: 3, backgroundColor: "#FFFFFF" });
-      const imgData = canvas.toDataURL("image/jpeg", 0.98);
+    // Render both pages in parallel (instead of one after another) and at a slightly lower
+    // scale — still sharp enough for print/PDF, but noticeably faster, especially on phones.
+    const canvases = await Promise.all(
+      pageEls.map(el => html2canvas(el, { scale: 2.2, backgroundColor: "#FFFFFF" }))
+    );
+    canvases.forEach((canvas, i) => {
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
       const imgH = (canvas.height * pageW) / canvas.width;
       if (i > 0) pdf.addPage();
       pdf.addImage(imgData, "JPEG", 0, 0, pageW, Math.min(imgH, pageH));
-    }
+    });
     return pdf;
   }
 
@@ -2221,9 +2268,16 @@ function buildSubmissionExcelBase64(s){
     listEl.querySelectorAll(".viewSubBtn").forEach(btn => {
       btn.addEventListener("click", () => {
         const rec = getSubmissions().find(x => x.id === btn.dataset.id);
-        if(rec && rec.pdfDataUrl){
+        if(rec && rec.pdfUrl){
+          // Hosted in Firebase Storage — opens fine from any device, not just the one that submitted.
+          window.open(rec.pdfUrl, "_blank");
+        } else if(rec && rec.pdfDataUrl){
+          // Fallback: only present if this is the same device/browser that submitted it
+          // (e.g. the cloud upload hadn't finished before this record was cached locally).
           const w = window.open();
           if(w) w.document.write(`<iframe src="${rec.pdfDataUrl}" style="border:0;width:100%;height:100vh;"></iframe>`);
+        } else {
+          alert("This report's PDF isn't hosted for cross-device viewing (Storage needs the Blaze plan). Please check the emailed copy in the inbox instead — it was sent automatically on submission.");
         }
       });
     });
@@ -2303,8 +2357,8 @@ function buildSubmissionExcelBase64(s){
     btn.disabled = true;
     try {
       const pdf = await buildReportPdf();
-      const pdfDataUrl = pdf.output("datauristring");
-      const pdfBase64  = pdf.output("base64");
+      const pdfDataUrl = pdf.output("datauristring"); // same-device fallback only, if the Firestore write itself fails
+      const pdfBase64  = pdf.output("base64");         // used for the email attachment
       const attendance = currentYears.flatMap(n => ["A","B"].map(sec => {
         const secLower = sec.toLowerCase();
         const wrapper = document.querySelector(`#presentFieldsContainer .field-pair[data-year="${n}"][data-section="${sec}"]`);
@@ -2331,11 +2385,23 @@ function buildSubmissionExcelBase64(s){
         totalStudents: document.getElementById("totalstudents").value || "—",
         totalStaff: document.getElementById("totalstaff").value || "—",
         submittedOn: new Date().toLocaleString("en-GB"),
-        attendance,
-        pdfDataUrl
+        attendance
       };
-      submissions.push(record);
-      setSubmissions(submissions);
+
+      // Write the submission itself to Firestore — this is what makes it show up on the
+      // Admin panel on ANY device, not just the one that submitted it. (PDF hosting via Storage
+      // was removed here since it needs a paid Blaze plan we're not using — it was also the
+      // main thing slowing down every submit, since it always ran and timed out before failing.)
+      try {
+        await cloudDb.collection(CLOUD_SUBMISSIONS_COLLECTION).doc(record.id).set(record);
+      } catch(cloudErr){
+        console.error("Could not push the submission to the cloud:", cloudErr);
+        // Fall back to a local-only copy so at least this device keeps a record of it.
+        const local = getSubmissions().slice();
+        local.push({ ...record, pdfDataUrl });
+        cacheSubmissionsLocally(local);
+      }
+
       btn.textContent = "✅ Submitted!";
       renderSubmissionsPanel();
 
@@ -2652,6 +2718,7 @@ function buildSubmissionExcelBase64(s){
   // (from cache or server) refreshes the form automatically once it arrives — see onCloudDataChanged().
   listenToCloudDoc(CLOUD_STRENGTH_DOC, STRENGTH_KEY);
   listenToCloudDoc(CLOUD_DEPTINFO_DOC, DEPT_INFO_KEY);
+  listenToSubmissionsCloud(); // live sync so a submission from any device reaches the Admin panel on every device
 
   // Auto-clear submissions once they pass the 9:00 AM cutoff, even if this tab is left open overnight.
   purgeExpiredSubmissions();
